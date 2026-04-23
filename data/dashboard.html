@@ -1,0 +1,3111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏中心资源位监控看板</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --c-tencent: #5B8FF9;
+            --c-netease: #F6903D;
+            --c-others: #E8E8E8;
+            --c-tencent-dark: #3B6BD6;
+            --c-netease-dark: #D97520;
+            --c-yoy-up: #E8684A;
+            --c-yoy-down: #62DAAB;
+            --c-bg: #F7F8FC;
+            --c-card: #FFFFFF;
+            --c-border: #EAEDF3;
+            --c-text: #1F2937;
+            --c-text-secondary: #6B7280;
+            --c-accent: #5B8FF9;
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: var(--font);
+            background: var(--c-bg);
+            color: var(--c-text);
+            -webkit-font-smoothing: antialiased;
+        }
+        .header {
+            background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+            color: white;
+            padding: 22px 32px;
+        }
+        .header h1 {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .header .subtitle {
+            font-size: 13px;
+            opacity: 0.7;
+            margin-top: 4px;
+            font-weight: 400;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .sticky-filter {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--c-card);
+            border-radius: 10px;
+            padding: 14px 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            transition: box-shadow 0.2s, border-radius 0.2s;
+            border: 1px solid var(--c-border);
+        }
+        .sticky-filter.is-stuck {
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border-top: none;
+        }
+        .sticky-filter .filters {
+            margin-bottom: 0;
+        }
+        .filter-compact {
+            padding: 7px 28px 7px 12px;
+            border: 1px solid var(--c-border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--c-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 8px center;
+            cursor: pointer;
+            font-family: var(--font);
+            color: var(--c-text);
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .filter-compact:hover {
+            border-color: var(--c-accent);
+        }
+        .filter-compact:focus {
+            outline: none;
+            border-color: var(--c-accent);
+            box-shadow: 0 0 0 2px rgba(91,143,249,0.15);
+        }
+        .filter-separator {
+            flex: 0 0 auto;
+            color: #9CA3AF;
+            font-size: 12px;
+            line-height: 1;
+        }
+
+        /* flatpickr覆写 */
+        .flatpickr-calendar {
+            font-family: var(--font) !important;
+        }
+        .board-section {
+            background: var(--c-card);
+            border-radius: 10px;
+            padding: 22px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            border: 1px solid var(--c-border);
+        }
+        .board-title-outer {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--c-text);
+            padding: 0 4px;
+            margin-bottom: 6px;
+            margin-top: 8px;
+        }
+        .board-title-outer .title-num-short {
+            display: none;
+        }
+        .board-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 8px;
+        }
+        .board-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--c-border);
+            color: var(--c-text);
+        }
+        .chart-container {
+            width: 100%;
+            height: 420px;
+        }
+        .filters {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .filter-group label {
+            display: none;
+        }
+        .filter-group select {
+            padding: 7px 28px 7px 12px;
+            border: 1px solid var(--c-border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--c-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 8px center;
+            cursor: pointer;
+            font-family: var(--font);
+            color: var(--c-text);
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .filter-group select:hover {
+            border-color: var(--c-accent);
+        }
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--c-accent);
+            box-shadow: 0 0 0 2px rgba(91,143,249,0.15);
+        }
+        .board-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--c-border);
+        }
+        .board-title-row .board-title {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .drill-down-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 14px;
+            border: 1px solid var(--c-border);
+            border-radius: 6px;
+            background: var(--c-card);
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--c-text-secondary);
+            font-family: var(--font);
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+        .drill-down-btn:hover {
+            border-color: var(--c-accent);
+            color: var(--c-accent);
+            background: rgba(91,143,249,0.04);
+        }
+        .drill-down-btn.active {
+            background: var(--c-accent);
+            color: white;
+            border-color: var(--c-accent);
+        }
+        .drill-down-btn svg {
+            transition: transform 0.3s;
+        }
+        .drill-down-btn.active svg {
+            transform: rotate(180deg);
+        }
+        .drill-down-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease;
+        }
+        .drill-down-container.expanded {
+            max-height: 520px;
+        }
+        .drill-down-chart {
+            width: 100%;
+            height: 400px;
+        }
+        .drill-down-inner {
+            margin-top: 16px;
+            border-top: 1px dashed var(--c-border);
+            padding-top: 16px;
+        }
+        .drill-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 12px;
+        }
+        .drill-tab {
+            padding: 6px 22px;
+            font-size: 13px;
+            font-family: var(--font);
+            font-weight: 500;
+            border: 1px solid var(--c-border);
+            background: #FAFBFC;
+            color: var(--c-text-secondary);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .drill-tab:first-child {
+            border-radius: 6px 0 0 6px;
+        }
+        .drill-tab:last-child {
+            border-radius: 0 6px 6px 0;
+            border-left: none;
+        }
+        .drill-tab.active-tab-tencent {
+            background: var(--c-tencent);
+            color: white;
+            border-color: var(--c-tencent);
+        }
+        .drill-tab.active-tab-netease {
+            background: var(--c-netease);
+            color: white;
+            border-color: var(--c-netease);
+        }
+        /* 画廊 */
+        .gallery-grid {
+            display: flex;
+            gap: 14px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 8px;
+            transition: max-height 0.3s;
+            flex-wrap: wrap;
+        }
+        .gallery-grid.collapsed {
+            max-height: 0;
+            overflow: hidden;
+        }
+        .gallery-card {
+            background: #FAFBFC;
+            border: 1px solid var(--c-border);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.15s;
+            flex: 0 0 calc(33.333% - 10px);
+            max-width: calc(33.333% - 10px);
+        }
+        @media (max-width: 900px) {
+            .gallery-card {
+                flex: 0 0 calc(50% - 7px);
+                max-width: calc(50% - 7px);
+            }
+        }
+            transition: box-shadow 0.2s, transform 0.15s;
+        }
+        .gallery-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
+        }
+        .gallery-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #F0F1F3;
+        }
+        .gallery-card .card-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            font-size: 12px;
+            color: var(--c-text-secondary);
+            border-bottom: 1px solid var(--c-border);
+            background: #fff;
+        }
+        .gallery-card .card-pos {
+            color: var(--c-text);
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .gallery-card .card-date {
+            margin-left: auto;
+            color: #9CA3AF;
+            font-size: 12px;
+        }
+        .level-tag {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+            margin-right: 4px;
+        }
+        .level-tag-S { background: #E8684A; }
+        .level-tag-Ap { background: #F6903D; }
+        .level-tag-A { background: #5B8FF9; }
+        .level-tag-Bp { background: #62DAAB; }
+        .level-tag-C { background: #9CA3AF; }
+        .no-screenshot {
+            padding: 30px;
+            text-align: center;
+            color: #D1D5DB;
+            font-size: 14px;
+        }
+        .screenshot-drawer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.26);
+            z-index: 9998;
+            justify-content: flex-end;
+        }
+        .screenshot-drawer-overlay.show {
+            display: flex;
+        }
+        .screenshot-drawer {
+            position: relative;
+            width: min(900px, 92vw);
+            height: 100vh;
+            background: #fff;
+            box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.24s ease;
+        }
+
+        .screenshot-drawer-overlay.show .screenshot-drawer {
+            transform: translateX(0);
+        }
+        .drawer-close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            background: #F3F4F6;
+            color: #374151;
+            font-size: 22px;
+            line-height: 1;
+        }
+        .drawer-close-floating {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 2;
+        }
+        .screenshot-drawer-body {
+            flex: 1;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            padding: 56px 20px 24px;
+        }
+
+        .screenshot-list-single {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .drawer-shot {
+            border: 1px solid var(--c-border);
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff;
+            cursor: pointer;
+        }
+        .drawer-shot-title {
+            padding: 12px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--c-text);
+            border-bottom: 1px solid var(--c-border);
+            background: #F8FAFC;
+            line-height: 1.5;
+        }
+        .drawer-shot img {
+            width: 100%;
+            display: block;
+            background: #F0F1F3;
+        }
+
+        /* 弹窗 */
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .modal-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+            background: white;
+            border-radius: 12px;
+            overflow: auto;
+            overscroll-behavior: contain;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-content img {
+            display: block;
+            max-width: 90vw;
+            max-height: 82vh;
+            object-fit: contain;
+        }
+        .modal-close {
+            position: absolute;
+            top: 10px; right: 14px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            font-size: 20px;
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: background 0.15s;
+        }
+        .modal-close:hover {
+            background: rgba(0,0,0,0.7);
+        }
+        .modal-caption {
+            padding: 10px 16px;
+            font-size: 13px;
+            color: var(--c-text-secondary);
+        }
+            padding: 8px 14px;
+            font-size: 13px;
+            color: #555;
+            font-family: 'STKaiti', 'KaiTi', '楷体', serif;
+        }
+        /* ─── 移动端适配 (iPhone 17 Pro ≈ 402px) ─── */
+        @media (max-width: 480px) {
+            .header {
+                padding: 10px 12px;
+            }
+            .header h1 {
+                font-size: 16px;
+            }
+            .header .subtitle {
+                font-size: 10px;
+                margin-top: 2px;
+            }
+            .container {
+                padding: 4px 1%;
+            }
+            /* 筛选器一行 */
+            .sticky-filter {
+                padding: 6px;
+                border-radius: 6px;
+                margin-bottom: 6px;
+            }
+            .sticky-filter.is-stuck {
+                border-radius: 0 0 6px 6px;
+            }
+            .filters {
+                gap: 6px;
+                flex-wrap: nowrap;
+            }
+            .sticky-filter .filters {
+                gap: 4px;
+            }
+            .sticky-filter .filters #filterTimeType {
+                flex: 0 0 64px;
+            }
+            .sticky-filter .filters #filterStart,
+            .sticky-filter .filters #filterEnd {
+                flex: 1 1 0;
+                min-width: 0;
+            }
+            .filter-compact {
+                width: 100%;
+                min-width: 0;
+                padding: 5px 20px 5px 8px;
+                font-size: 11px;
+                background-position: right 6px center;
+                background-size: 10px 10px;
+            }
+            .filter-group select {
+                padding: 5px 20px 5px 8px;
+                font-size: 11px;
+                background-position: right 6px center;
+                background-size: 10px 10px;
+            }
+            .filter-separator {
+                font-size: 11px;
+            }
+
+            /* 卡片极致紧凑 */
+            .board-section {
+                padding: 6px 1%;
+                margin-bottom: 6px;
+                border-radius: 6px;
+            }
+            .board-title-outer {
+                font-size: 13px;
+                margin-bottom: 4px;
+                margin-top: 6px;
+                padding: 0 1%;
+            }
+            .board-toolbar {
+                margin-bottom: 4px;
+            }
+            .board-title {
+                font-size: 13px;
+                margin-bottom: 6px;
+                padding-bottom: 4px;
+            }
+            /* 图表撑满 */
+            .chart-container {
+                height: 280px;
+                margin: 0 -2px;
+            }
+            .drill-down-chart {
+                height: 260px;
+                margin: 0 -2px;
+            }
+            .drill-down-btn {
+                font-size: 11px;
+                padding: 3px 8px;
+                white-space: nowrap;
+            }
+            .drill-tabs {
+                margin-bottom: 6px;
+            }
+            .drill-tab {
+                padding: 4px 12px;
+                font-size: 11px;
+            }
+            .drill-down-inner {
+                margin-top: 6px;
+                padding-top: 6px;
+            }
+            .drill-down-inner > div:first-child {
+                gap: 4px 8px !important;
+                flex-wrap: wrap !important;
+            }
+            /* 画廊：手机上一排1张 */
+            .gallery-card {
+                flex: 0 0 100% !important;
+                max-width: 100% !important;
+            }
+            .gallery-card .card-info {
+                padding: 6px 8px;
+            }
+            .gallery-card .card-pos {
+                font-size: 12px;
+            }
+            /* 弹窗 */
+            .modal-content {
+                max-width: 96vw;
+                border-radius: 8px;
+            }
+            .modal-caption {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>游戏中心资源位监控看板</h1>
+        <div class="subtitle" id="headerSubtitle">数据周期：2025年1月 - 2026年3月 | 渠道：华为/OPPO/VIVO/小米/荣耀</div>
+    </div>
+
+    <div class="container">
+        <!-- 全局时间筛选器（吸顶） -->
+        <div class="sticky-filter" id="globalFilter">
+            <div class="filters">
+                <select id="filterTimeType" class="filter-compact">
+                    <option value="monthly" selected>按月</option>
+                    <option value="daily">按日</option>
+                </select>
+                <select id="filterStart" class="filter-compact"></select>
+                <span class="filter-separator">至</span>
+                <select id="filterEnd" class="filter-compact"></select>
+
+            </div>
+        </div>
+
+        <!-- 看板一：硬核资源位厂商分布 -->
+        <div class="board-title-outer" id="title1">1. 硬核资源位厂商分布</div>
+        <div class="board-section">
+            <div class="board-toolbar">
+                <button class="drill-down-btn" id="drillDownBtn1" onclick="toggleDrillDown1()">
+                    <span>下钻明细</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+            <div id="chart1" class="chart-container"></div>
+            <div class="drill-down-container" id="drillDownContainer1">
+                <div class="drill-down-inner">
+                    <div class="drill-tabs">
+                        <button class="drill-tab active-tab-tencent" id="tabTencent" onclick="switchDrillTab('tencent')">腾讯</button>
+                        <button class="drill-tab" id="tabNetease" onclick="switchDrillTab('netease')">网易</button>
+                    </div>
+                    <div id="chart1Detail" class="drill-down-chart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 看板二：渠道资源占比厂商分布 -->
+        <div class="board-title-outer" id="title2">2. 渠道资源占比厂商分布</div>
+        <div class="board-section">
+            <div class="board-toolbar">
+                <button class="drill-down-btn" id="drillDownBtn2" onclick="toggleDrillDown2()">
+                    <span>下钻明细</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+            <div id="chart2" class="chart-container"></div>
+            <div class="drill-down-container" id="drillDownContainer2">
+                <div class="drill-down-inner">
+                    <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">
+                        <div class="drill-tabs" style="margin-bottom:0;">
+                            <button class="drill-tab active-tab-tencent" id="tab2Tencent" onclick="switchDrillTab2('tencent')">腾讯</button>
+                            <button class="drill-tab" id="tab2Netease" onclick="switchDrillTab2('netease')">网易</button>
+                        </div>
+                        <div class="filter-group">
+                            <label>渠道：</label>
+                            <select id="drill2Channel" onchange="updateChart2Detail()">
+                                <option value="ALL">ALL</option>
+                                <option value="华为">华为</option>
+                                <option value="OPPO">OPPO</option>
+                                <option value="VIVO">VIVO</option>
+                                <option value="荣耀">荣耀</option>
+                                <option value="小米">小米</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="chart2Detail" class="drill-down-chart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 看板三：渠道资源占比厂商分布-分等级 -->
+        <div class="board-title-outer" id="title3">3. 渠道资源占比厂商分布-分等级</div>
+        <div class="board-section">
+            <div class="board-toolbar">
+                <button class="drill-down-btn" id="drillDownBtn3" onclick="toggleDrillDown3()">
+                    <span>下钻明细</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+            <div id="chart3" class="chart-container"></div>
+            <div class="drill-down-container" id="drillDownContainer3">
+                <div class="drill-down-inner">
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+                        <div class="drill-tabs" style="margin-bottom:0;">
+                            <button class="drill-tab active-tab-tencent" id="tab3Tencent" onclick="switchDrillTab3('tencent')">腾讯</button>
+                            <button class="drill-tab" id="tab3Netease" onclick="switchDrillTab3('netease')">网易</button>
+                        </div>
+                        <div class="filter-group">
+                            <label>渠道：</label>
+                            <select id="drill3Channel" onchange="updateChart3Detail()">
+                                <option value="ALL">ALL</option>
+                                <option value="华为">华为</option>
+                                <option value="OPPO">OPPO</option>
+                                <option value="VIVO">VIVO</option>
+                                <option value="荣耀">荣耀</option>
+                                <option value="小米">小米</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>等级：</label>
+                            <select id="drill3Level" onchange="updateChart3Detail()">
+                                <option value="ALL">ALL</option>
+                                <option value="S">S</option>
+                                <option value="A+">A+</option>
+                                <option value="A">A</option>
+                                <option value="B+">B+</option>
+                                <option value="C">C</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="chart3Detail" class="drill-down-chart"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 看板四：渠道资源占比游戏分布 -->
+        <div class="board-title-outer" id="title4">4. 渠道资源占比游戏分布</div>
+        <div class="board-section">
+            <div class="board-toolbar">
+                <button class="drill-down-btn" id="drillDownBtn4" onclick="toggleDrillDown4()">
+                    <span>下钻分析</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+            </div>
+            <div class="filters">
+                <div class="filter-group">
+                    <label>厂商：</label>
+                    <select id="filterVendor">
+                        <option value="腾讯">腾讯</option>
+                        <option value="网易">网易</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>渠道：</label>
+                    <select id="filterChannel">
+                        <option value="ALL">ALL</option>
+                        <option value="华为">华为</option>
+                        <option value="OPPO">OPPO</option>
+                        <option value="VIVO">VIVO</option>
+                        <option value="小米">小米</option>
+                        <option value="荣耀">荣耀</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>资源等级：</label>
+                    <select id="filterLevel">
+                        <option value="ALL">ALL</option>
+                        <option value="S">S</option>
+                        <option value="A+">A+</option>
+                        <option value="A">A</option>
+                        <option value="B+">B+</option>
+                        <option value="C">C</option>
+                    </select>
+                </div>
+            </div>
+            <div id="chart4" class="chart-container"></div>
+            <div class="drill-down-container" id="drillDownContainer4" style="max-height:0;">
+                <div class="drill-down-inner">
+                    <!-- 下钻筛选器 -->
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+                        <div class="filter-group">
+                            <label>游戏：</label>
+                            <select id="drill4Game" onchange="updateDrill4()">
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>渠道：</label>
+                            <select id="drill4Channel" onchange="updateDrill4()">
+                                <option value="华为">华为</option>
+                                <option value="OPPO">OPPO</option>
+                                <option value="VIVO">VIVO</option>
+                                <option value="荣耀">荣耀</option>
+                                <option value="小米">小米</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>等级：</label>
+                            <select id="drill4Level" onchange="updateDrill4()">
+                                <option value="S">S</option>
+                                <option value="A+">A+</option>
+                                <option value="A">A</option>
+                                <option value="B+">B+</option>
+                                <option value="C">C</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- 时间趋势图 -->
+                    <div id="chart4Detail" class="drill-down-chart"></div>
+                    <div style="text-align:center;padding:8px 0;color:#9CA3AF;font-size:12px;">点击柱状图后，会在右侧抽屉按单列展示对应截图</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="screenshot-drawer-overlay" id="drill4ScreenshotDrawer" onclick="closeDrill4ScreenshotDrawer()">
+        <div class="screenshot-drawer" onclick="event.stopPropagation()">
+            <button class="drawer-close-btn drawer-close-floating" onclick="closeDrill4ScreenshotDrawer()">×</button>
+            <div class="screenshot-drawer-body">
+                <div id="drill4ScreenshotList" class="screenshot-list-single"></div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="modal-overlay" id="imgModal" onclick="closeImageModal()">
+
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeImageModal()">&times;</button>
+            <img id="modalImg" src="" alt="截图预览" />
+            <div class="modal-caption" id="modalCaption"></div>
+        </div>
+    </div>
+
+    <script>
+        // ─── 全局数据（从 all_data.json 加载）───
+        let ALL_DATA = null;
+        let SNAPSHOT_SCREENSHOTS = {};
+        const CHANNELS_5 = ['华为', 'OPPO', 'VIVO', '荣耀', '小米'];
+        const LEVELS_5 = ['S', 'A+', 'A', 'B+', 'C'];
+        const DASHBOARD_BUILD_ID = '20260423-1800';
+
+
+        function deepClone(obj) {
+            return JSON.parse(JSON.stringify(obj || {}));
+        }
+
+        function withCacheBust(fileName) {
+            const separator = fileName.includes('?') ? '&' : '?';
+            return `${fileName}${separator}v=${DASHBOARD_BUILD_ID}`;
+        }
+
+        function fetchJsonWithFallback(fileName, optional) {
+            return fetch(withCacheBust(fileName), { cache: 'no-store' })
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                })
+                .catch(() => fetch(withCacheBust('./' + fileName), { cache: 'no-store' }).then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                }))
+                .catch(err => {
+                    if (optional) return null;
+                    throw err;
+                });
+        }
+
+
+        function mergeDashboardData(baseData, snapshotData) {
+            const merged = deepClone(baseData);
+            if (!snapshotData) return merged;
+
+            merged.daily = Object.assign({}, merged.daily || {}, snapshotData.daily || {});
+            merged.monthly = Object.assign({}, merged.monthly || {}, snapshotData.monthly || {});
+            merged.board4_daily = Object.assign({}, merged.board4_daily || {}, snapshotData.board4_daily || {});
+            merged.board4_monthly = Object.assign({}, merged.board4_monthly || {}, snapshotData.board4_monthly || {});
+            merged.meta = Object.assign({}, merged.meta || {}, snapshotData.meta || {});
+
+            const baseRange = (baseData && baseData.meta && baseData.meta.date_range) || {};
+            const snapshotDays = (snapshotData.meta && snapshotData.meta.snapshot_days) || [];
+            const snapshotStart = snapshotDays.length > 0 ? snapshotDays[0] : '';
+            const snapshotEnd = snapshotDays.length > 0 ? snapshotDays[snapshotDays.length - 1] : '';
+            const start = [baseRange.start || '', snapshotStart].filter(Boolean).sort()[0] || '';
+            const end = [baseRange.end || '', snapshotEnd].filter(Boolean).sort().slice(-1)[0] || '';
+            merged.meta.date_range = { start, end };
+            return merged;
+        }
+
+        function formatRangeDate(dateStr) {
+            if (!dateStr) return '';
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                return `${parts[0]}年${parseInt(parts[1], 10)}月${parseInt(parts[2], 10)}日`;
+            }
+            if (parts.length === 2) {
+                return `${parts[0]}年${parseInt(parts[1], 10)}月`;
+            }
+            return dateStr;
+        }
+
+        function updateHeaderSubtitle() {
+            const subtitle = document.getElementById('headerSubtitle');
+            if (!subtitle || !ALL_DATA || !ALL_DATA.meta || !ALL_DATA.meta.date_range) return;
+            const range = ALL_DATA.meta.date_range;
+            subtitle.textContent = `数据周期：${formatRangeDate(range.start)} - ${formatRangeDate(range.end)} | 渠道：华为/OPPO/VIVO/小米/荣耀`;
+        }
+
+        function getLevelTagClass(level) {
+            return 'level-tag level-tag-' + String(level || '').replace('+', 'p');
+        }
+
+        function escapeHtml(text) {
+            return String(text == null ? '' : text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeScreenshotPath(rawPath) {
+            return String(rawPath || '').trim().replace(/\\/g, '/');
+        }
+
+        function getSortedCurrentRange() {
+
+
+            let start = currentRange.start || '';
+            let end = currentRange.end || '';
+            if (start > end) {
+                const tmp = start;
+                start = end;
+                end = tmp;
+            }
+            return { start, end };
+        }
+
+        function getSnapshotShots(game, channel, level, dateKey) {
+            const channelData = SNAPSHOT_SCREENSHOTS[channel] || {};
+            const gameData = channelData[game] || {};
+            const shots = gameData[level] || [];
+            return dateKey ? shots.filter(shot => shot.dateKey === dateKey) : shots;
+        }
+
+        function syncOverlayScrollLock() {
+            const drawer = document.getElementById('drill4ScreenshotDrawer');
+            const modal = document.getElementById('imgModal');
+            const shouldLock = (drawer && drawer.classList.contains('show')) || (modal && modal.classList.contains('show'));
+            document.documentElement.style.overflow = shouldLock ? 'hidden' : '';
+            document.body.style.overflow = shouldLock ? 'hidden' : '';
+        }
+
+        function getAllChartInstances() {
+            const chartIds = ['chart1', 'chart2', 'chart3', 'chart4', 'chart1Detail', 'chart2Detail', 'chart3Detail', 'chart4Detail'];
+            return chartIds
+                .map(id => document.getElementById(id))
+                .filter(Boolean)
+                .map(dom => echarts.getInstanceByDom(dom))
+                .filter(Boolean);
+        }
+
+        function hideAllChartTooltips() {
+            getAllChartInstances().forEach(chart => {
+                try {
+                    chart.dispatchAction({ type: 'hideTip' });
+                    chart.getZr().handler.dispatch('globalout', { type: 'globalout' });
+                } catch (e) {
+                    // ignore chart tooltip cleanup errors
+                }
+            });
+        }
+
+        function renderScreenshotCards(list, shots, game, channel, level) {
+
+            if (!list) return;
+            list.innerHTML = shots.map(shot => {
+                const caption = `${game}｜${channel}｜${level}级｜${shot.pos}｜${shot.date}`;
+                const imgPath = normalizeScreenshotPath(shot.img);
+                return `
+                    <div class="drawer-shot" data-src="${escapeHtml(imgPath)}" data-caption="${escapeHtml(caption)}">
+                        <div class="drawer-shot-title">${escapeHtml(caption)}</div>
+                        <img src="${escapeHtml(imgPath)}" alt="${escapeHtml(caption)}" loading="lazy" />
+                    </div>
+                `;
+            }).join('');
+
+            list.querySelectorAll('.drawer-shot').forEach(card => {
+                card.addEventListener('click', () => openImageModal(card.dataset.src || '', card.dataset.caption || ''));
+            });
+        }
+
+
+
+        function openDrill4ScreenshotDrawer(game, channel, level, dateKey) {
+            const drawer = document.getElementById('drill4ScreenshotDrawer');
+            const list = document.getElementById('drill4ScreenshotList');
+            if (!drawer || !list) return;
+
+            hideAllChartTooltips();
+            const timeType = document.getElementById('filterTimeType').value;
+
+
+            if (timeType !== 'daily') {
+                list.innerHTML = '<div class="no-screenshot">当前为按月模式，请切到按日后点击具体日期柱子查看截图</div>';
+                drawer.classList.add('show');
+                syncOverlayScrollLock();
+                return;
+            }
+
+            if (!dateKey) {
+                list.innerHTML = '<div class="no-screenshot">未识别到具体日期，请重新点击柱状图查看</div>';
+                drawer.classList.add('show');
+                syncOverlayScrollLock();
+                return;
+            }
+
+            const shots = getSnapshotShots(game, channel, level, dateKey);
+            if (shots.length === 0) {
+                list.innerHTML = '<div class="no-screenshot">该日期下暂无匹配截图，请保持当前下钻筛选后重新尝试</div>';
+                drawer.classList.add('show');
+                syncOverlayScrollLock();
+                return;
+            }
+
+            renderScreenshotCards(list, shots, game, channel, level);
+            drawer.classList.add('show');
+            syncOverlayScrollLock();
+        }
+
+        function closeDrill4ScreenshotDrawer() {
+            const drawer = document.getElementById('drill4ScreenshotDrawer');
+            const list = document.getElementById('drill4ScreenshotList');
+            if (drawer) drawer.classList.remove('show');
+            if (list) list.innerHTML = '';
+            syncOverlayScrollLock();
+        }
+
+
+        function openImageModal(src, caption) {
+            const modal = document.getElementById('imgModal');
+            const img = document.getElementById('modalImg');
+            const text = document.getElementById('modalCaption');
+            if (!modal || !img || !text) return;
+            hideAllChartTooltips();
+            img.src = src;
+            text.textContent = caption || '';
+            modal.classList.add('show');
+            syncOverlayScrollLock();
+        }
+
+
+        function closeImageModal() {
+            const modal = document.getElementById('imgModal');
+            const img = document.getElementById('modalImg');
+            const text = document.getElementById('modalCaption');
+            if (modal) modal.classList.remove('show');
+            if (img) img.src = '';
+            if (text) text.textContent = '';
+            syncOverlayScrollLock();
+        }
+
+
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeImageModal();
+                closeDrill4ScreenshotDrawer();
+            }
+        });
+
+
+        // 获取在时间范围内的月份key列表
+
+        function getMonthKeys(startMonth, endMonth) {
+            const keys = [];
+            if (!ALL_DATA) return keys;
+            const allMonths = Object.keys(ALL_DATA.monthly).sort();
+            for (const m of allMonths) {
+                if (m >= startMonth && m <= endMonth) keys.push(m);
+            }
+            return keys;
+        }
+
+        // 获取在时间范围内的日期key列表
+        function getDayKeys(startDay, endDay) {
+            const keys = [];
+            if (!ALL_DATA) return keys;
+            const allDays = Object.keys(ALL_DATA.daily).sort();
+            for (const d of allDays) {
+                if (d >= startDay && d <= endDay) keys.push(d);
+            }
+            return keys;
+        }
+
+        // 聚合多个时间段的 board1 数据
+        function aggregateBoard1(timeKeys, source) {
+            const r = { '腾讯': 0, '网易': 0, '其他': 0 };
+            for (const k of timeKeys) {
+                const d = source[k];
+                if (!d) continue;
+                r['腾讯'] += d.board1['腾讯'] || 0;
+                r['网易'] += d.board1['网易'] || 0;
+                r['其他'] += d.board1['其他'] || 0;
+            }
+            return r;
+        }
+
+        // 聚合多个时间段的 board2 数据
+        function aggregateBoard2(timeKeys, source) {
+            const r = {};
+            for (const ch of CHANNELS_5) {
+                r[ch] = { '腾讯': 0, '网易': 0, '其他': 0 };
+            }
+            for (const k of timeKeys) {
+                const d = source[k];
+                if (!d) continue;
+                for (const ch of CHANNELS_5) {
+                    if (!d.board2[ch]) continue;
+                    r[ch]['腾讯'] += d.board2[ch]['腾讯'] || 0;
+                    r[ch]['网易'] += d.board2[ch]['网易'] || 0;
+                    r[ch]['其他'] += d.board2[ch]['其他'] || 0;
+                }
+            }
+            return r;
+        }
+
+        // 聚合多个时间段的 board3 数据
+        function aggregateBoard3(timeKeys, source) {
+            const r = {};
+            for (const ch of CHANNELS_5) {
+                r[ch] = {};
+                for (const v of ['腾讯', '网易']) {
+                    r[ch][v] = { total: 0 };
+                    for (const lv of LEVELS_5) r[ch][v][lv] = 0;
+                }
+            }
+            for (const k of timeKeys) {
+                const d = source[k];
+                if (!d) continue;
+                for (const ch of CHANNELS_5) {
+                    if (!d.board3[ch]) continue;
+                    for (const v of ['腾讯', '网易']) {
+                        if (!d.board3[ch][v]) continue;
+                        for (const lv of LEVELS_5) {
+                            r[ch][v][lv] += d.board3[ch][v][lv] || 0;
+                        }
+                        r[ch][v].total += d.board3[ch][v].total || 0;
+                    }
+                }
+            }
+            return r;
+        }
+
+        // 聚合多个时间段的 board4 数据（可用于月度或日度）
+        function aggregateBoard4FromSource(timeKeys, sourceMap) {
+            const result = {};
+            const safeSource = sourceMap || {};
+            for (const vendor of ['腾讯', '网易']) {
+                result[vendor] = {};
+                const channels = [...CHANNELS_5, 'ALL'];
+                for (const ch of channels) {
+                    result[vendor][ch] = {};
+                    const lvls = [...LEVELS_5, 'ALL'];
+                    for (const lv of lvls) {
+                        const gameMap = {};
+                        for (const timeKey of timeKeys) {
+                            const b4 = safeSource[timeKey];
+                            if (!b4 || !b4[vendor] || !b4[vendor][ch] || !b4[vendor][ch][lv]) continue;
+                            for (const item of b4[vendor][ch][lv]) {
+                                if (!gameMap[item.name]) gameMap[item.name] = { value: 0, levels: {}, channels: {} };
+                                gameMap[item.name].value += item.value;
+                                if (item.levels) {
+                                    for (const [levelName, count] of Object.entries(item.levels)) {
+                                        gameMap[item.name].levels[levelName] = (gameMap[item.name].levels[levelName] || 0) + count;
+                                    }
+                                }
+                                if (item.channels) {
+                                    for (const [channelName, count] of Object.entries(item.channels)) {
+                                        gameMap[item.name].channels[channelName] = (gameMap[item.name].channels[channelName] || 0) + count;
+                                    }
+                                }
+                            }
+                        }
+                        result[vendor][ch][lv] = Object.entries(gameMap)
+                            .map(([name, data]) => {
+                                const obj = { name, value: data.value };
+                                if (Object.keys(data.levels).length > 0) obj.levels = data.levels;
+                                if (Object.keys(data.channels).length > 0) obj.channels = data.channels;
+                                return obj;
+                            })
+                            .sort((a, b) => b.value - a.value)
+                            .slice(0, 10);
+                    }
+                }
+            }
+            return result;
+        }
+
+        function aggregateBoard4(monthKeys) {
+            if (!ALL_DATA) return {};
+            return aggregateBoard4FromSource(monthKeys, ALL_DATA.board4_monthly || {});
+        }
+
+        function getBoard4ItemCount(board4Source, vendor, channel, level, game) {
+            if (!board4Source || !board4Source[vendor]) return 0;
+            const channelData = board4Source[vendor][channel];
+            if (!channelData || !channelData[level]) return 0;
+            const item = channelData[level].find(g => g.name === game);
+            return item ? item.value || 0 : 0;
+        }
+
+        // 根据当前时间筛选获取时间key和source
+        function getCurrentTimeKeysAndSource() {
+            const timeType = document.getElementById('filterTimeType').value;
+            let start = currentRange.start;
+            let end = currentRange.end;
+            if (start > end) { const t = start; start = end; end = t; }
+            if (timeType === 'monthly') {
+                return { keys: getMonthKeys(start, end), source: ALL_DATA.monthly, type: 'monthly' };
+            } else {
+                return { keys: getDayKeys(start, end), source: ALL_DATA.daily, type: 'daily' };
+            }
+        }
+
+        // 获取去年同期的时间key
+        function getLastYearKeys(keys, type) {
+            return keys.map(k => {
+                const parts = k.split('-');
+                parts[0] = String(parseInt(parts[0]) - 1);
+                return parts.join('-');
+            });
+        }
+
+        // 初始化用的数据（默认 2026-01 到 2026-03）
+        let board1Data, board2Data, board3Data, board4Data;
+
+        // 从JSON动态构建初始数据的函数
+        function buildInitialData() {
+            if (!ALL_DATA) return;
+            const monthKeys = getMonthKeys('2026-01', '2026-03');
+            const lastYearKeys = getMonthKeys('2025-01', '2025-03');
+
+            // board1
+            const cur1 = aggregateBoard1(monthKeys, ALL_DATA.monthly);
+            const last1 = aggregateBoard1(lastYearKeys, ALL_DATA.monthly);
+            const curTotal = cur1['腾讯'] + cur1['网易'] + cur1['其他'];
+            const lastTotal = last1['腾讯'] + last1['网易'] + last1['其他'];
+            board1Data = {
+                categories: ['去年同期', '当前周期'],
+                series: [
+                    { name: '腾讯', rawData: [last1['腾讯'], cur1['腾讯']] },
+                    { name: '网易', rawData: [last1['网易'], cur1['网易']] },
+                    { name: '其他', rawData: [last1['其他'], cur1['其他']] }
+                ],
+                totals: [lastTotal, curTotal]
+            };
+
+            // board2
+            const cur2 = aggregateBoard2(monthKeys, ALL_DATA.monthly);
+            board2Data = {
+                categories: CHANNELS_5,
+                series: [
+                    { name: '腾讯', rawData: CHANNELS_5.map(ch => cur2[ch]['腾讯']) },
+                    { name: '网易', rawData: CHANNELS_5.map(ch => cur2[ch]['网易']) },
+                    { name: '其他', rawData: CHANNELS_5.map(ch => cur2[ch]['其他']) }
+                ],
+                totals: CHANNELS_5.map(ch => cur2[ch]['腾讯'] + cur2[ch]['网易'] + cur2[ch]['其他'])
+            };
+
+            // board3
+            const cur3 = aggregateBoard3(monthKeys, ALL_DATA.monthly);
+            board3Data = {
+                channels: CHANNELS_5,
+                tencent: { totals: CHANNELS_5.map(ch => cur3[ch]['腾讯'].total) },
+                netease: { totals: CHANNELS_5.map(ch => cur3[ch]['网易'].total) }
+            };
+            for (const lv of LEVELS_5) {
+                board3Data.tencent[lv] = CHANNELS_5.map(ch => {
+                    const t = cur3[ch]['腾讯'].total;
+                    return t > 0 ? +(cur3[ch]['腾讯'][lv] / t * 100).toFixed(1) : 0;
+                });
+                board3Data.netease[lv] = CHANNELS_5.map(ch => {
+                    const t = cur3[ch]['网易'].total;
+                    return t > 0 ? +(cur3[ch]['网易'][lv] / t * 100).toFixed(1) : 0;
+                });
+            }
+
+            // board4
+            board4Data = aggregateBoard4(monthKeys);
+        }
+
+        // 响应式grid配置
+        function getGrid(extra) {
+            const m = window.innerWidth <= 480;
+            const base = {
+                left: m ? 0 : '2%',
+                right: m ? 0 : '3%',
+                bottom: m ? '16%' : '14%',
+                top: m ? '6%' : '8%',
+                containLabel: true,
+                backgroundColor: '#F5F6F8',
+                show: true,
+                borderColor: 'transparent'
+            };
+            return Object.assign(base, extra || {});
+        }
+
+        
+        // YoY右轴配置：扩大范围让折线在图表中部，不遮挡柱顶
+        function getYoYAxis(yoyData) {
+            if (!yoyData || yoyData.length === 0) {
+                return { type: 'value', show: false, min: -100, max: 100, axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } };
+            }
+            const absMax = Math.max(Math.abs(Math.min.apply(null, yoyData)), Math.abs(Math.max.apply(null, yoyData)), 10);
+            const range = Math.ceil(absMax * 5 / 10) * 10;
+            return {
+                type: 'value',
+                min: -range, max: range,
+                axisLabel: { show: false },
+                splitLine: { show: false },
+                axisLine: { show: false },
+                axisTick: { show: false }
+            };
+        }
+
+        // 颜色配置
+        const colorConfig = {
+            tencent: '#5B8FF9',
+            netease: '#F6903D',
+            others: '#E8E8E8'
+        };
+
+        // 计算YoY百分比
+        function calcYoY(oldVal, newVal) {
+            if (oldVal === 0) return newVal > 0 ? '+∞' : '0.0%';
+            const pct = ((newVal - oldVal) / oldVal * 100).toFixed(1);
+            return (pct >= 0 ? '+' : '') + pct + '%';
+        }
+
+        // 生成看板一虚线连接线的markLine数据
+        function buildChart1YoYLines(rawDataOld, rawDataNew) {
+            // rawDataOld/New: [腾讯, 网易, 其他] 的绝对值
+            const lines = [];
+            const names = ['腾讯', '网易', '其他'];
+            for (let i = 0; i < 3; i++) {
+                const oldBottom = rawDataOld.slice(0, i).reduce((a, b) => a + b, 0);
+                const oldTop = oldBottom + rawDataOld[i];
+                const newBottom = rawDataNew.slice(0, i).reduce((a, b) => a + b, 0);
+                const newTop = newBottom + rawDataNew[i];
+                const yoy = calcYoY(rawDataOld[i], rawDataNew[i]);
+                const oldTotal = rawDataOld.reduce((a, b) => a + b, 0);
+                const newTotal = rawDataNew.reduce((a, b) => a + b, 0);
+                lines.push({
+                    oldBottom, oldTop, newBottom, newTop,
+                    name: names[i], yoy,
+                    pctOld: oldTotal > 0 ? ((rawDataOld[i] / oldTotal) * 100).toFixed(1) : '0.0',
+                    pctNew: newTotal > 0 ? ((rawDataNew[i] / newTotal) * 100).toFixed(1) : '0.0',
+                    absOld: rawDataOld[i],
+                    absNew: rawDataNew[i]
+                });
+            }
+            return lines;
+        }
+
+        function buildChart1PctLabelElement(candidate) {
+            return {
+                type: 'text',
+                style: {
+                    text: candidate.text,
+                    x: candidate.x,
+                    y: candidate.y,
+                    fill: candidate.fill,
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif',
+                    textAlign: 'center',
+                    textVerticalAlign: 'middle'
+                },
+                z: 20
+            };
+        }
+
+        function resolveChart1PctLabelCollisions(candidates) {
+            const minLabelGap = 22;
+            return candidates
+                .slice()
+                .sort((a, b) => {
+                    if (b.height !== a.height) return b.height - a.height;
+                    if (b.abs !== a.abs) return b.abs - a.abs;
+                    return a.y - b.y;
+                })
+                .reduce((selected, candidate) => {
+                    const overlaps = selected.some(item => Math.abs(item.y - candidate.y) < minLabelGap);
+                    if (!overlaps) selected.push(candidate);
+                    return selected;
+                }, [])
+                .sort((a, b) => a.y - b.y);
+        }
+
+        // 用 graphic 绘制虚线和YoY标注（独立函数，可在updateAllCharts中复用）
+        function buildChart1GraphicElements(chart) {
+            const oldData = board1Data.series.map(s => s.rawData[0]);
+            const newData = board1Data.series.map(s => s.rawData[1]);
+            const yoyLines = buildChart1YoYLines(oldData, newData);
+
+            const elements = [];
+            const leftLabelCandidates = [];
+            const rightLabelCandidates = [];
+
+            // 等待图表渲染完成才能获取坐标转换
+            try {
+                const grid = chart.getModel().getComponent('grid', 0);
+                if (!grid) return elements;
+                const gridRect = grid.coordinateSystem.getRect();
+                if (!gridRect) return elements;
+
+                // 计算柱宽
+                const barWidth = gridRect.width / 2 * 0.35;
+                const x0Center = chart.convertToPixel({ xAxisIndex: 0 }, 0);
+                const x1Center = chart.convertToPixel({ xAxisIndex: 0 }, 1);
+                if (x0Center == null || x1Center == null) return elements;
+
+                const x0Right = x0Center + barWidth;
+                const x1Left = x1Center - barWidth;
+                const midX = (x0Right + x1Left) / 2;
+                const minLabelHeight = 26;
+
+                yoyLines.forEach((line, idx) => {
+                    const y0Top = chart.convertToPixel({ yAxisIndex: 0 }, line.oldTop);
+                    const y0Bottom = chart.convertToPixel({ yAxisIndex: 0 }, line.oldBottom);
+                    const y1Top = chart.convertToPixel({ yAxisIndex: 0 }, line.newTop);
+                    const y1Bottom = chart.convertToPixel({ yAxisIndex: 0 }, line.newBottom);
+                    if (y0Top == null || y0Bottom == null || y1Top == null || y1Bottom == null) return;
+
+                    // 色块高度（像素）
+                    const oldHeight = Math.abs(y0Bottom - y0Top);
+                    const newHeight = Math.abs(y1Bottom - y1Top);
+
+                    // 上虚线（连接两个色块的顶部）
+                    elements.push({
+                        type: 'line',
+                        shape: { x1: x0Right, y1: y0Top, x2: x1Left, y2: y1Top },
+                        style: { stroke: '#999', lineWidth: 1, lineDash: [4, 3] },
+                        z: 10
+                    });
+
+                    // 下虚线（连接两个色块的底部）
+                    elements.push({
+                        type: 'line',
+                        shape: { x1: x0Right, y1: y0Bottom, x2: x1Left, y2: y1Bottom },
+                        style: { stroke: '#999', lineWidth: 1, lineDash: [4, 3] },
+                        z: 10
+                    });
+
+                    // YoY百分比标注（放在两条虚线中间）
+                    const midY = (y0Top + y0Bottom + y1Top + y1Bottom) / 4;
+                    const isPositive = !line.yoy.startsWith('-');
+                    elements.push({
+                        type: 'text',
+                        style: {
+                            text: line.yoy,
+                            x: midX,
+                            y: midY,
+                            fill: isPositive ? '#e74c3c' : '#27ae60',
+                            fontSize: 13,
+                            fontWeight: 'bold',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif',
+                            textAlign: 'center',
+                            textVerticalAlign: 'middle'
+                        },
+                        z: 20
+                    });
+
+                    // 左柱占比标注（仅在色块够高且不与其他标签碰撞时显示）
+                    const leftMidY = (y0Top + y0Bottom) / 2;
+                    if (oldHeight >= minLabelHeight && line.absOld > 0) {
+                        leftLabelCandidates.push({
+                            text: line.pctOld + '%',
+                            x: x0Center,
+                            y: leftMidY,
+                            fill: idx === 0 ? '#fff' : '#333',
+                            height: oldHeight,
+                            abs: line.absOld
+                        });
+                    }
+
+                    // 右柱占比标注（仅在色块够高且不与其他标签碰撞时显示）
+                    const rightMidY = (y1Top + y1Bottom) / 2;
+                    if (newHeight >= minLabelHeight && line.absNew > 0) {
+                        rightLabelCandidates.push({
+                            text: line.pctNew + '%',
+                            x: x1Center,
+                            y: rightMidY,
+                            fill: idx === 0 ? '#fff' : '#333',
+                            height: newHeight,
+                            abs: line.absNew
+                        });
+                    }
+                });
+
+                resolveChart1PctLabelCollisions(leftLabelCandidates).forEach(candidate => {
+                    elements.push(buildChart1PctLabelElement(candidate));
+                });
+                resolveChart1PctLabelCollisions(rightLabelCandidates).forEach(candidate => {
+                    elements.push(buildChart1PctLabelElement(candidate));
+                });
+            } catch(e) {
+                // chart未就绪，返回空
+            }
+
+            return elements;
+        }
+
+
+        // 刷新看板一的graphic元素
+        function refreshChart1Graphic(chart) {
+            if (!chart) return;
+            setTimeout(() => {
+                try {
+                    const elements = buildChart1GraphicElements(chart);
+                    chart.setOption({ graphic: elements }, { replaceMerge: ['graphic'] });
+                } catch(e) {}
+            }, 200);
+        }
+
+
+        // 初始化看板一
+        function initChart1() {
+            const chart = echarts.init(document.getElementById('chart1'));
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        let total = 0;
+                        params.forEach(item => { total += item.value || 0; });
+                        result += `总计: ${total.toLocaleString()}<br/>`;
+                        params.forEach(item => {
+                            const rawValue = item.value || 0;
+                            const pct = total > 0 ? ((rawValue / total) * 100).toFixed(1) : 0;
+                            result += `${item.marker} ${item.seriesName}: ${rawValue.toLocaleString()} (${pct}%)<br/>`;
+                        });
+                        return result;
+                    }
+                },
+                legend: { bottom: 0, data: ['腾讯', '网易', '其他'],
+                    
+                    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                },
+                grid: getGrid(),
+                xAxis: {
+                    type: 'category',
+                    data: board1Data.categories,
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '{value}',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                    },
+                    splitLine: { show: false },
+                    axisLine: { show: true, lineStyle: { color: '#333' } }
+                },
+                series: [
+                    {
+                        name: '腾讯',
+                        type: 'bar',
+                        stack: 'total',
+                        barMaxWidth: 80,
+                        emphasis: { focus: 'series' },
+                        data: board1Data.series[0].rawData,
+                        itemStyle: { color: colorConfig.tencent },
+                        label: { show: false }
+                    },
+                    {
+                        name: '网易',
+                        type: 'bar',
+                        stack: 'total',
+                        emphasis: { focus: 'series' },
+                        data: board1Data.series[1].rawData,
+                        itemStyle: { color: colorConfig.netease },
+                        label: { show: false }
+                    },
+                    {
+                        name: '其他',
+                        type: 'bar',
+                        stack: 'total',
+                        emphasis: { focus: 'series' },
+                        data: board1Data.series[2].rawData,
+                        itemStyle: { color: colorConfig.others, borderColor: '#D1D5DB', borderWidth: 1 },
+                        label: { 
+                            show: true, 
+                            formatter: function(params) {
+                                const idx = params.dataIndex;
+                                return board1Data.totals[idx].toLocaleString();
+                            },
+                            position: 'top', color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                        }
+                    }
+                ]
+            };
+            chart.setOption(option);
+
+            // 渲染完成后绘制虚线和YoY
+            refreshChart1Graphic(chart);
+
+            return chart;
+        }
+
+        // ─── 下钻图表（看板一明细）───
+        let chart1Detail = null;
+        let drillDown1Expanded = false;
+        let drillTab = 'tencent'; // 当前选中的tab
+
+        function toggleDrillDown1() {
+            const container = document.getElementById('drillDownContainer1');
+            const btn = document.getElementById('drillDownBtn1');
+            drillDown1Expanded = !drillDown1Expanded;
+
+            if (drillDown1Expanded) {
+                container.classList.add('expanded');
+                btn.classList.add('active');
+                if (!chart1Detail) {
+                    chart1Detail = echarts.init(document.getElementById('chart1Detail'));
+                }
+                updateChart1Detail();
+            } else {
+                container.classList.remove('expanded');
+                btn.classList.remove('active');
+            }
+        }
+
+        function switchDrillTab(tab) {
+            drillTab = tab;
+            const btnT = document.getElementById('tabTencent');
+            const btnN = document.getElementById('tabNetease');
+            btnT.className = 'drill-tab' + (tab === 'tencent' ? ' active-tab-tencent' : '');
+            btnN.className = 'drill-tab' + (tab === 'netease' ? ' active-tab-netease' : '');
+            updateChart1Detail();
+        }
+
+        // 从JSON获取下钻1的时间序列数据
+        function getDrill1TimeData() {
+            if (!ALL_DATA) return null;
+            const timeType = document.getElementById('filterTimeType').value;
+            let start = currentRange.start;
+            let end = currentRange.end;
+            if (start > end) { const t = start; start = end; end = t; }
+
+            const labels = [];
+            const current = { tencent: [], netease: [] };
+            const lastYear = { tencent: [], netease: [] };
+
+            if (timeType === 'monthly') {
+                const keys = getMonthKeys(start, end);
+                for (const k of keys) {
+                    const d = ALL_DATA.monthly[k];
+                    if (!d) continue;
+                    labels.push(k.split('-')[1].replace(/^0/, '') + '月');
+                    current.tencent.push(d.board1['腾讯'] || 0);
+                    current.netease.push(d.board1['网易'] || 0);
+                    // 去年同期
+                    const lastK = (parseInt(k.split('-')[0]) - 1) + '-' + k.split('-')[1];
+                    const ld = ALL_DATA.monthly[lastK];
+                    lastYear.tencent.push(ld ? ld.board1['腾讯'] || 0 : 0);
+                    lastYear.netease.push(ld ? ld.board1['网易'] || 0 : 0);
+                }
+            } else {
+                const keys = getDayKeys(start, end);
+                for (const k of keys) {
+                    const d = ALL_DATA.daily[k];
+                    if (!d) continue;
+                    labels.push(parseInt(k.split('-')[2]) + '日');
+                    current.tencent.push(d.board1['腾讯'] || 0);
+                    current.netease.push(d.board1['网易'] || 0);
+                    const parts = k.split('-');
+                    const lastK = (parseInt(parts[0]) - 1) + '-' + parts[1] + '-' + parts[2];
+                    const ld = ALL_DATA.daily[lastK];
+                    lastYear.tencent.push(ld ? ld.board1['腾讯'] || 0 : 0);
+                    lastYear.netease.push(ld ? ld.board1['网易'] || 0 : 0);
+                }
+            }
+            return { labels, current, lastYear };
+        }
+
+        function updateChart1Detail() {
+            if (!chart1Detail) return;
+
+            const timeType = document.getElementById('filterTimeType').value;
+            const isMonthly = timeType === 'monthly';
+            const src = getDrill1TimeData();
+            if (!src || src.labels.length === 0) return;
+            const xLabels = src.labels;
+            const key = drillTab === 'tencent' ? 'tencent' : 'netease';
+            const vendorName = drillTab === 'tencent' ? '腾讯' : '网易';
+            const barColor = drillTab === 'tencent' ? '#5B8FF9' : '#F6903D';
+            const lineColor = drillTab === 'tencent' ? '#E8684A' : '#C2410C';
+
+            const curData = src.current[key];
+            const lastData = src.lastYear[key];
+
+            // 计算YoY
+            const yoyData = xLabels.map((_, i) => {
+                return lastData[i] > 0 ? +((curData[i] - lastData[i]) / lastData[i] * 100).toFixed(1) : 0;
+            });
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        params.forEach(p => {
+                            if (p.componentSubType === 'bar') {
+                                result += `${p.marker} ${p.seriesName}: ${p.value.toLocaleString()}<br/>`;
+                            } else {
+                                result += `${p.marker} ${p.seriesName}: ${p.value >= 0 ? '+' : ''}${p.value}%<br/>`;
+                            }
+                        });
+                        return result;
+                    }
+                },
+                legend: { bottom: 0, data: [vendorName, vendorName + ' YoY'],
+                    
+                    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                },
+                grid: getGrid(),
+                xAxis: {
+                    type: 'category',
+                    data: xLabels,
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif',
+                        interval: isMonthly ? 0 : 'auto',
+                        rotate: isMonthly ? 0 : 30
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: '资源数量',
+                        nameTextStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                        axisLabel: { formatter: '{value}', fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                        splitLine: { show: false },
+                        axisLine: { show: true, lineStyle: { color: '#333' } }
+                    },
+                    getYoYAxis(yoyData)
+                ],
+                series: [
+                    {
+                        name: vendorName,
+                        type: 'bar',
+                        data: curData,
+                        barMaxWidth: 50,
+                        itemStyle: { color: barColor, borderRadius: [3, 3, 0, 0] },
+                        label: { show: isMonthly, position: 'top', formatter: '{c}', fontSize: 11, color: '#333', fontWeight: 500, textBorderColor: '#fff', textBorderWidth: 2, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                    },
+                    {
+                        name: vendorName + ' YoY',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: yoyData,
+                        symbol: 'circle',
+                        symbolSize: 9,
+                        lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                        itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                        label: { show: isMonthly, position: 'top', formatter: function(params) { return (params.value >= 0 ? '+' : '') + params.value + '%'; }, fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                    }
+                ]
+            };
+
+            chart1Detail.setOption(option, true);
+        }
+
+        // 初始化看板二
+        function initChart2() {
+            const chart = echarts.init(document.getElementById('chart2'));
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        // 动态计算总数
+                        let total = 0;
+                        params.forEach(item => {
+                            total += item.value || 0;
+                        });
+                        result += `总计: ${total.toLocaleString()}<br/>`;
+                        params.forEach(item => {
+                            const rawValue = item.value || 0;
+                            const pct = total > 0 ? ((rawValue / total) * 100).toFixed(1) : 0;
+                            result += `${item.marker} ${item.seriesName}: ${rawValue.toLocaleString()} (${pct}%)<br/>`;
+                        });
+                        return result;
+                    }
+                },
+                legend: { bottom: 0, data: ['腾讯', '网易', '其他'],
+                    
+                    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                },
+                grid: getGrid(),
+                xAxis: {
+                    type: 'category',
+                    data: board2Data.categories,
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '{value}',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                    },
+                    splitLine: { show: false },
+                    axisLine: { show: true, lineStyle: { color: '#333' } }
+                },
+                series: [
+                    {
+                        name: '腾讯',
+                        type: 'bar',
+                        stack: 'total',
+                        emphasis: { focus: 'series' },
+                        data: board2Data.series[0].rawData,
+                        itemStyle: { color: colorConfig.tencent },
+                        label: { show: false }
+                    },
+                    {
+                        name: '网易',
+                        type: 'bar',
+                        stack: 'total',
+                        emphasis: { focus: 'series' },
+                        data: board2Data.series[1].rawData,
+                        itemStyle: { color: colorConfig.netease },
+                        label: { show: false }
+                    },
+                    {
+                        name: '其他',
+                        type: 'bar',
+                        stack: 'total',
+                        emphasis: { focus: 'series' },
+                        data: board2Data.series[2].rawData,
+                        itemStyle: { color: colorConfig.others, borderColor: '#D1D5DB', borderWidth: 1 },
+                        label: { 
+                            show: true, 
+                            formatter: function(params) {
+                                const idx = params.dataIndex;
+                                return board2Data.totals[idx].toLocaleString();
+                            },
+                            position: 'top', color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                        }
+                    }
+                ]
+            };
+            chart.setOption(option);
+            return chart;
+        }
+
+        // ─── 下钻图表（看板二明细）───
+        let chart2Detail = null;
+        let drillDown2Expanded = false;
+        let drill2Tab = 'tencent';
+
+        function toggleDrillDown2() {
+            const container = document.getElementById('drillDownContainer2');
+            const btn = document.getElementById('drillDownBtn2');
+            drillDown2Expanded = !drillDown2Expanded;
+
+            if (drillDown2Expanded) {
+                container.classList.add('expanded');
+                btn.classList.add('active');
+                if (!chart2Detail) {
+                    chart2Detail = echarts.init(document.getElementById('chart2Detail'));
+                }
+                updateChart2Detail();
+            } else {
+                container.classList.remove('expanded');
+                btn.classList.remove('active');
+            }
+        }
+
+        function switchDrillTab2(tab) {
+            drill2Tab = tab;
+            document.getElementById('tab2Tencent').className = 'drill-tab' + (tab === 'tencent' ? ' active-tab-tencent' : '');
+            document.getElementById('tab2Netease').className = 'drill-tab' + (tab === 'netease' ? ' active-tab-netease' : '');
+            updateChart2Detail();
+        }
+
+        // 从JSON获取下钻2的时间序列数据
+        function getDrill2TimeData() {
+            if (!ALL_DATA) return null;
+            const timeType = document.getElementById('filterTimeType').value;
+            let start = currentRange.start, end = currentRange.end;
+            if (start > end) { const t = start; start = end; end = t; }
+            const labels = [];
+            const channels = CHANNELS_5;
+            const current = { tencent: {}, netease: {} };
+            const lastYear = { tencent: {}, netease: {} };
+            channels.forEach(ch => { current.tencent[ch] = []; current.netease[ch] = []; lastYear.tencent[ch] = []; lastYear.netease[ch] = []; });
+
+            const keys = timeType === 'monthly' ? getMonthKeys(start, end) : getDayKeys(start, end);
+            const source = timeType === 'monthly' ? ALL_DATA.monthly : ALL_DATA.daily;
+            for (const k of keys) {
+                const d = source[k];
+                if (!d) continue;
+                if (timeType === 'monthly') labels.push(k.split('-')[1].replace(/^0/, '') + '月');
+                else labels.push(parseInt(k.split('-')[2]) + '日');
+                channels.forEach(ch => {
+                    current.tencent[ch].push(d.board2[ch] ? d.board2[ch]['腾讯'] || 0 : 0);
+                    current.netease[ch].push(d.board2[ch] ? d.board2[ch]['网易'] || 0 : 0);
+                });
+                // 去年同期
+                const parts = k.split('-');
+                const lastK = (parseInt(parts[0]) - 1) + '-' + parts.slice(1).join('-');
+                const ld = source[lastK];
+                channels.forEach(ch => {
+                    lastYear.tencent[ch].push(ld && ld.board2[ch] ? ld.board2[ch]['腾讯'] || 0 : 0);
+                    lastYear.netease[ch].push(ld && ld.board2[ch] ? ld.board2[ch]['网易'] || 0 : 0);
+                });
+            }
+            return { labels, current, lastYear };
+        }
+
+        const channelColors = {
+            '华为': '#5B8FF9', 'OPPO': '#62DAAB', 'VIVO': '#F6903D',
+            '荣耀': '#6DC8EC', '小米': '#E8684A'
+        };
+
+        function updateChart2Detail() {
+            if (!chart2Detail) return;
+
+            const timeType = document.getElementById('filterTimeType').value;
+            const isMonthly = timeType === 'monthly';
+            const src = getDrill2TimeData();
+            if (!src || src.labels.length === 0) return;
+            const xLabels = src.labels;
+            const key = drill2Tab;
+            const channel = document.getElementById('drill2Channel').value;
+            const vendorName = drill2Tab === 'tencent' ? '腾讯' : '网易';
+            const channels = ['华为', 'OPPO', 'VIVO', '荣耀', '小米'];
+
+            let series = [];
+            let legendData = [];
+            let yoyForAxis = [];
+
+            if (channel === 'ALL') {
+                // 分组柱状图：5个渠道各一根柱子
+                channels.forEach(ch => {
+                    legendData.push(ch);
+                    series.push({
+                        name: ch,
+                        type: 'bar',
+                        data: src.current[key][ch],
+                        itemStyle: { color: channelColors[ch], borderRadius: [2, 2, 0, 0] },
+                        label: { show: false }
+                    });
+                });
+
+                // ALL模式下加一条总量YoY折线
+                const yoyTotal = xLabels.map((_, i) => {
+                    const curSum = channels.reduce((s, ch) => s + src.current[key][ch][i], 0);
+                    const lastSum = channels.reduce((s, ch) => s + src.lastYear[key][ch][i], 0);
+                    return lastSum > 0 ? +((curSum - lastSum) / lastSum * 100).toFixed(1) : 0;
+                });
+                yoyForAxis = yoyTotal;
+                legendData.push('总量 YoY');
+                series.push({
+                    name: '总量 YoY',
+                    type: 'line',
+                    yAxisIndex: 1,
+                    data: yoyTotal,
+                    symbol: 'circle',
+                    symbolSize: 9,
+                    lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                    itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                    label: { show: isMonthly, position: 'top', formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; }, fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                });
+            } else {
+                // 单渠道：单柱 + YoY折线
+                const barColor = drill2Tab === 'tencent' ? '#5B8FF9' : '#F6903D';
+                const lineColor = drill2Tab === 'tencent' ? '#E8684A' : '#C2410C';
+                const curData = src.current[key][channel];
+                const lastData = src.lastYear[key][channel];
+                const yoyData = xLabels.map((_, i) => {
+                    return lastData[i] > 0 ? +((curData[i] - lastData[i]) / lastData[i] * 100).toFixed(1) : 0;
+                });
+                yoyForAxis = yoyData;
+
+                legendData = [channel, channel + ' YoY'];
+                series = [
+                    {
+                        name: channel,
+                        type: 'bar',
+                        data: curData,
+                        barMaxWidth: 50,
+                        itemStyle: { color: barColor, borderRadius: [3, 3, 0, 0] },
+                        label: { show: isMonthly, position: 'top', formatter: '{c}', fontSize: 11, color: '#333', fontWeight: 500, textBorderColor: '#fff', textBorderWidth: 2, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                    },
+                    {
+                        name: channel + ' YoY',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: yoyData,
+                        symbol: 'circle',
+                        symbolSize: 9,
+                        lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                        itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                        label: {
+                            show: isMonthly,
+                            formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; },
+                            fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3,
+                            fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                        }
+                    }
+                ];
+            }
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        const bars = params.filter(p => p.componentSubType === 'bar');
+                        let total = 0;
+                        bars.forEach(b => { total += b.value || 0; });
+                        if (channel === 'ALL') result += `${vendorName}总计: ${total.toLocaleString()}<br/>`;
+                        bars.forEach(b => {
+                            const pct = total > 0 ? ((b.value / total) * 100).toFixed(1) : 0;
+                            result += `${b.marker} ${b.seriesName}: ${b.value.toLocaleString()}` + (channel === 'ALL' ? ` (${pct}%)` : '') + '<br/>';
+                        });
+                        params.filter(p => p.componentSubType === 'line').forEach(lp => {
+                            result += `${lp.marker} ${lp.seriesName}: ${lp.value >= 0 ? '+' : ''}${lp.value}%<br/>`;
+                        });
+                        return result;
+                    }
+                },
+                legend: { bottom: 0, data: legendData,
+                    
+                    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                },
+                grid: getGrid(),
+                xAxis: {
+                    type: 'category',
+                    data: xLabels,
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif',
+                        interval: isMonthly ? 0 : 'auto',
+                        rotate: isMonthly ? 0 : 30
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value', name: '资源数量',
+                        nameTextStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                        axisLabel: { formatter: '{value}', fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                        splitLine: { show: false },
+                        axisLine: { show: true, lineStyle: { color: '#333' } }
+                    },
+                    getYoYAxis(yoyForAxis)
+                ],
+                series: series
+            };
+
+            chart2Detail.setOption(option, true);
+        }
+
+        // 初始化看板三
+        function initChart3() {
+            const chart = echarts.init(document.getElementById('chart3'));
+            
+            // 构建数据：5个渠道，每个渠道2个柱子（腾讯、网易），各自堆叠等级
+            const channels = board3Data.channels;
+            
+            // 为每个等级创建两个系列（腾讯、网易）
+            const series = [];
+            // 从高等级到低等级排序（S在最上面）- 但数据计算时要反过来
+            const levels = ['C', 'B+', 'A', 'A+', 'S'];
+            const displayLevels = ['S', 'A+', 'A', 'B+', 'C']; // 图例显示顺序（从高到低）
+            
+            // 腾讯：蓝色系渐变
+            const tencentColors = {
+                'S': '#1D4ED8',
+                'A+': '#3B82F6',
+                'A': '#60A5FA',
+                'B+': '#93C5FD',
+                'C': '#BFDBFE'
+            };
+            
+            // 网易：橙色系渐变
+            const neteaseColors = {
+                'S': '#C2410C',
+                'A+': '#EA580C',
+                'A': '#F97316',
+                'B+': '#FDBA74',
+                'C': '#FED7AA'
+            };
+            
+            // 计算每个等级的绝对值
+            const tencentAbsData = {};
+            const neteaseAbsData = {};
+            
+            levels.forEach(level => {
+                tencentAbsData[level] = board3Data.tencent[level].map((pct, idx) => {
+                    return Math.round(board3Data.tencent.totals[idx] * pct / 100);
+                });
+                neteaseAbsData[level] = board3Data.netease[level].map((pct, idx) => {
+                    return Math.round(board3Data.netease.totals[idx] * pct / 100);
+                });
+            });
+            
+            levels.forEach(level => {
+                // 腾讯系列（蓝色系）
+                series.push({
+                    name: `${level}(腾讯)`,
+                    type: 'bar',
+                    stack: '腾讯',
+                    data: tencentAbsData[level],
+                    itemStyle: { color: tencentColors[level] },
+                    barGap: '20%',
+                    label: { show: false }
+                });
+                // 网易系列（浅灰蓝色系）
+                series.push({
+                    name: `${level}(网易)`,
+                    type: 'bar',
+                    stack: '网易',
+                    data: neteaseAbsData[level],
+                    itemStyle: { color: neteaseColors[level] },
+                    label: { show: false }
+                });
+            });
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        // 按渠道分组显示
+                        const channelIdx = Math.floor(params[0].dataIndex);
+                        const channel = channels[channelIdx];
+                        let result = `<strong>${channel}</strong><br/>`;
+                        
+                        // 获取腾讯和网易的总数
+                        const tencentTotal = board3Data.tencent.totals[channelIdx];
+                        const neteaseTotal = board3Data.netease.totals[channelIdx];
+                        
+                        // 腾讯数据
+                        result += `<strong>腾讯 (总计: ${tencentTotal.toLocaleString()})</strong><br/>`;
+                        params.filter(p => p.seriesName.includes('腾讯') && p.value > 0).reverse().forEach(item => {
+                            const level = item.seriesName.replace('(腾讯)', '');
+                            const pct = board3Data.tencent[level][channelIdx];
+                            result += `${item.marker} ${level}: ${item.value} (${pct}%)<br/>`;
+                        });
+                        
+                        // 网易数据
+                        result += `<strong>网易 (总计: ${neteaseTotal.toLocaleString()})</strong><br/>`;
+                        params.filter(p => p.seriesName.includes('网易') && p.value > 0).reverse().forEach(item => {
+                            const level = item.seriesName.replace('(网易)', '');
+                            const pct = board3Data.netease[level][channelIdx];
+                            result += `${item.marker} ${level}: ${item.value} (${pct}%)<br/>`;
+                        });
+                        
+                        return result;
+                    }
+                },
+                legend: { bottom: 0, data: displayLevels.map(l => `${l}(腾讯)`).concat(displayLevels.map(l => `${l}(网易)`)),
+                    itemWidth: 12,
+                    itemHeight: 10,
+                    textStyle: { fontSize: 10, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                    width: '95%',
+                    itemGap: 8
+                },
+                grid: getGrid({ top: '18%' }),
+                xAxis: {
+                    type: 'category',
+                    data: channels,
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        interval: 0,
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '{value}',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                    },
+                    splitLine: { show: false },
+                    axisLine: { show: true, lineStyle: { color: '#333' } }
+                },
+                series: series
+            };
+            chart.setOption(option);
+            return chart;
+        }
+
+        // ─── 下钻图表（看板三明细）───
+        let chart3Detail = null;
+        let drillDown3Expanded = false;
+        let drill3Tab = 'tencent';
+
+        function toggleDrillDown3() {
+            const container = document.getElementById('drillDownContainer3');
+            const btn = document.getElementById('drillDownBtn3');
+            drillDown3Expanded = !drillDown3Expanded;
+            if (drillDown3Expanded) {
+                container.classList.add('expanded');
+                btn.classList.add('active');
+                if (!chart3Detail) {
+                    chart3Detail = echarts.init(document.getElementById('chart3Detail'));
+                }
+                updateChart3Detail();
+            } else {
+                container.classList.remove('expanded');
+                btn.classList.remove('active');
+            }
+        }
+
+        function switchDrillTab3(tab) {
+            drill3Tab = tab;
+            document.getElementById('tab3Tencent').className = 'drill-tab' + (tab === 'tencent' ? ' active-tab-tencent' : '');
+            document.getElementById('tab3Netease').className = 'drill-tab' + (tab === 'netease' ? ' active-tab-netease' : '');
+            updateChart3Detail();
+        }
+
+        // 从JSON获取下钻3的时间序列数据
+        function getDrill3TimeData() {
+            if (!ALL_DATA) return null;
+            const timeType = document.getElementById('filterTimeType').value;
+            let start = currentRange.start, end = currentRange.end;
+            if (start > end) { const t = start; start = end; end = t; }
+            const labels = [];
+            const channels = CHANNELS_5;
+            const levels = LEVELS_5;
+            const current = { tencent: {}, netease: {} };
+            const lastYear = { tencent: {}, netease: {} };
+            channels.forEach(ch => {
+                current.tencent[ch] = {}; current.netease[ch] = {};
+                lastYear.tencent[ch] = {}; lastYear.netease[ch] = {};
+                levels.forEach(lv => {
+                    current.tencent[ch][lv] = []; current.netease[ch][lv] = [];
+                    lastYear.tencent[ch][lv] = []; lastYear.netease[ch][lv] = [];
+                });
+            });
+
+            const keys = timeType === 'monthly' ? getMonthKeys(start, end) : getDayKeys(start, end);
+            const source = timeType === 'monthly' ? ALL_DATA.monthly : ALL_DATA.daily;
+            for (const k of keys) {
+                const d = source[k];
+                if (!d) continue;
+                if (timeType === 'monthly') labels.push(k.split('-')[1].replace(/^0/, '') + '月');
+                else labels.push(parseInt(k.split('-')[2]) + '日');
+                channels.forEach(ch => {
+                    levels.forEach(lv => {
+                        current.tencent[ch][lv].push(d.board3[ch] && d.board3[ch]['腾讯'] ? d.board3[ch]['腾讯'][lv] || 0 : 0);
+                        current.netease[ch][lv].push(d.board3[ch] && d.board3[ch]['网易'] ? d.board3[ch]['网易'][lv] || 0 : 0);
+                    });
+                });
+                const parts = k.split('-');
+                const lastK = (parseInt(parts[0]) - 1) + '-' + parts.slice(1).join('-');
+                const ld = source[lastK];
+                channels.forEach(ch => {
+                    levels.forEach(lv => {
+                        lastYear.tencent[ch][lv].push(ld && ld.board3[ch] && ld.board3[ch]['腾讯'] ? ld.board3[ch]['腾讯'][lv] || 0 : 0);
+                        lastYear.netease[ch][lv].push(ld && ld.board3[ch] && ld.board3[ch]['网易'] ? ld.board3[ch]['网易'][lv] || 0 : 0);
+                    });
+                });
+            }
+            return { labels, current, lastYear };
+        }
+
+        const levelColors3 = {
+            'S': '#1D4ED8', 'A+': '#3B82F6', 'A': '#60A5FA', 'B+': '#93C5FD', 'C': '#BFDBFE'
+        };
+        const levelColors3Netease = {
+            'S': '#C2410C', 'A+': '#EA580C', 'A': '#F97316', 'B+': '#FDBA74', 'C': '#FED7AA'
+        };
+
+        function updateChart3Detail() {
+            if (!chart3Detail) return;
+
+            const timeType = document.getElementById('filterTimeType').value;
+            const isMonthly = timeType === 'monthly';
+            const src = getDrill3TimeData();
+            if (!src || src.labels.length === 0) return;
+            const xLabels = src.labels;
+            const key = drill3Tab;
+            const vendorName = drill3Tab === 'tencent' ? '腾讯' : '网易';
+            const channel = document.getElementById('drill3Channel').value;
+            const level = document.getElementById('drill3Level').value;
+            const channelsArr = ['华为', 'OPPO', 'VIVO', '荣耀', '小米'];
+            const levelsArr = ['S', 'A+', 'A', 'B+', 'C'];
+            const lvColors = drill3Tab === 'tencent' ? levelColors3 : levelColors3Netease;
+
+            let series = [];
+            let legendData = [];
+            let yoyForAxis3 = [];
+
+            // 辅助：求某渠道某等级的合计
+            function getSum(ch, lv, i, year) {
+                return year[key][ch][lv][i];
+            }
+            // 辅助：某渠道全等级合计
+            function getChTotal(ch, i, year) {
+                return levelsArr.reduce((s, lv) => s + (year[key][ch][lv][i] || 0), 0);
+            }
+            // 辅助：某等级全渠道合计
+            function getLvTotal(lv, i, year) {
+                return channelsArr.reduce((s, ch) => s + (year[key][ch][lv][i] || 0), 0);
+            }
+
+            if (channel === 'ALL' && level === 'ALL') {
+                // 5个渠道分组柱（每根=渠道总量）+ YoY折线
+                channelsArr.forEach(ch => {
+                    legendData.push(ch);
+                    series.push({
+                        name: ch,
+                        type: 'bar',
+                        data: xLabels.map((_, i) => getChTotal(ch, i, src.current)),
+                        itemStyle: { color: channelColors[ch], borderRadius: [2, 2, 0, 0] }
+                    });
+                });
+                const yoy = xLabels.map((_, i) => {
+                    const cur = channelsArr.reduce((s, ch) => s + getChTotal(ch, i, src.current), 0);
+                    const last = channelsArr.reduce((s, ch) => s + getChTotal(ch, i, src.lastYear), 0);
+                    return last > 0 ? +((cur - last) / last * 100).toFixed(1) : 0;
+                });
+                yoyForAxis3 = yoy;
+                legendData.push('总量 YoY');
+                series.push({
+                    name: '总量 YoY', type: 'line', yAxisIndex: 1, data: yoy,
+                    symbol: 'circle', symbolSize: 9,
+                    lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                    itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                    label: { show: isMonthly, position: 'top', formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; }, fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                });
+            } else if (channel === 'ALL' && level !== 'ALL') {
+                // 5个渠道分组柱（只看该等级）+ YoY折线
+                channelsArr.forEach(ch => {
+                    legendData.push(ch);
+                    series.push({
+                        name: ch, type: 'bar',
+                        data: xLabels.map((_, i) => getSum(ch, level, i, src.current)),
+                        itemStyle: { color: channelColors[ch], borderRadius: [2, 2, 0, 0] }
+                    });
+                });
+                const yoy = xLabels.map((_, i) => {
+                    const cur = channelsArr.reduce((s, ch) => s + getSum(ch, level, i, src.current), 0);
+                    const last = channelsArr.reduce((s, ch) => s + getSum(ch, level, i, src.lastYear), 0);
+                    return last > 0 ? +((cur - last) / last * 100).toFixed(1) : 0;
+                });
+                yoyForAxis3 = yoy;
+                legendData.push(level + ' YoY');
+                series.push({
+                    name: level + ' YoY', type: 'line', yAxisIndex: 1, data: yoy,
+                    symbol: 'circle', symbolSize: 9,
+                    lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                    itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                    label: { show: isMonthly, position: 'top', formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; }, fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                });
+            } else if (channel !== 'ALL' && level === 'ALL') {
+                // 5个等级分组柱 + YoY折线
+                levelsArr.forEach(lv => {
+                    legendData.push(lv);
+                    series.push({
+                        name: lv, type: 'bar',
+                        data: xLabels.map((_, i) => getSum(channel, lv, i, src.current)),
+                        itemStyle: { color: lvColors[lv], borderRadius: [2, 2, 0, 0] }
+                    });
+                });
+                const yoy = xLabels.map((_, i) => {
+                    const cur = getChTotal(channel, i, src.current);
+                    const last = getChTotal(channel, i, src.lastYear);
+                    return last > 0 ? +((cur - last) / last * 100).toFixed(1) : 0;
+                });
+                yoyForAxis3 = yoy;
+                legendData.push(channel + ' YoY');
+                series.push({
+                    name: channel + ' YoY', type: 'line', yAxisIndex: 1, data: yoy,
+                    symbol: 'circle', symbolSize: 9,
+                    lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                    itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                    label: { show: isMonthly, position: 'top', formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; }, fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                });
+            } else {
+                // 单渠道 + 单等级：单柱 + YoY
+                const barColor = drill3Tab === 'tencent' ? '#5B8FF9' : '#F6903D';
+                const lineColor = drill3Tab === 'tencent' ? '#E8684A' : '#C2410C';
+                const curData = xLabels.map((_, i) => getSum(channel, level, i, src.current));
+                const lastData = xLabels.map((_, i) => getSum(channel, level, i, src.lastYear));
+                const yoy = xLabels.map((_, i) => lastData[i] > 0 ? +((curData[i] - lastData[i]) / lastData[i] * 100).toFixed(1) : 0);
+
+                
+                yoyForAxis3 = yoy;
+legendData = [channel + ' ' + level, 'YoY'];
+                series = [
+                    {
+                        name: channel + ' ' + level, type: 'bar', data: curData,
+                        barMaxWidth: 50,
+                        itemStyle: { color: barColor, borderRadius: [3, 3, 0, 0] },
+                        label: { show: isMonthly, position: 'top', formatter: '{c}', fontSize: 11, color: '#333', fontWeight: 500, textBorderColor: '#fff', textBorderWidth: 2, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                    },
+                    {
+                        name: 'YoY', type: 'line', yAxisIndex: 1, data: yoy,
+                        symbol: 'circle', symbolSize: 9,
+                        lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                        itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                        label: { show: isMonthly, formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; },
+                            fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                    }
+                ];
+            }
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        const bars = params.filter(p => p.componentSubType === 'bar');
+                        let total = 0;
+                        bars.forEach(b => { total += b.value || 0; });
+                        if (bars.length > 1) result += `${vendorName}总计: ${total.toLocaleString()}<br/>`;
+                        bars.forEach(b => {
+                            const pct = total > 0 ? ((b.value / total) * 100).toFixed(1) : 0;
+                            result += `${b.marker} ${b.seriesName}: ${b.value.toLocaleString()}` + (bars.length > 1 ? ` (${pct}%)` : '') + '<br/>';
+                        });
+                        params.filter(p => p.componentSubType === 'line').forEach(lp => {
+                            result += `${lp.marker} ${lp.seriesName}: ${lp.value >= 0 ? '+' : ''}${lp.value}%<br/>`;
+                        });
+                        return result;
+                    }
+                },
+                legend: { bottom: 0, data: legendData,  textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' } },
+                grid: getGrid(),
+                xAxis: {
+                    type: 'category', data: xLabels,
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif', interval: isMonthly ? 0 : 'auto', rotate: isMonthly ? 0 : 30 }
+                },
+                yAxis: [
+                    { type: 'value', name: '资源数量', nameTextStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                      axisLabel: { formatter: '{value}', fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                      splitLine: { show: false }, axisLine: { show: true, lineStyle: { color: '#333' } } },
+                    getYoYAxis(yoyForAxis3)
+                ],
+                series: series
+            };
+            chart3Detail.setOption(option, true);
+        }
+
+        // 初始化看板四
+        function initChart4() {
+            const chart = echarts.init(document.getElementById('chart4'));
+            updateChart4(chart);
+            return chart;
+        }
+
+        // 看板四等级颜色配置（蓝、浅灰、白的延伸）- 按等级从高到低排序
+        const levelColors4 = {
+            'S': '#E8684A',
+            'A+': '#F6903D',
+            'A': '#5B8FF9',
+            'B+': '#62DAAB',
+            'C': '#9CA3AF'
+        };
+        const levelOrder4 = ['S', 'A+', 'A', 'B+', 'C'];
+        
+        // 渠道颜色映射 - 高区分度
+        const channelColorMap4 = {
+            '华为': '#5B8FF9', 'OPPO': '#62DAAB', 'VIVO': '#F6903D',
+            '小米': '#E8684A', '荣耀': '#6DC8EC',
+            '4399': '#9270CA', '好游快爆': '#FF9D4D', 'B站': '#5AD8A6', 'TapTap': '#5D7092'
+        };
+
+        function updateChart4(chart) {
+            const vendor = document.getElementById('filterVendor').value;
+            const channel = document.getElementById('filterChannel').value;
+            const level = document.getElementById('filterLevel').value;
+            
+            // 时间因子已不需要（数据已按时间聚合）
+            const factor = 1;
+            
+            let data = [];
+            let series = [];
+            
+            // 获取数据，如果不存在则使用空数组
+            const vendorData = (board4Data && board4Data[vendor]) || {};
+            const channelData = vendorData[channel] || {};
+            
+            if (channel === 'ALL' && level === 'ALL') {
+                // ALL渠道+ALL等级 = 堆叠柱状图（等级分布）
+                data = vendorData['ALL'] && vendorData['ALL']['ALL'] ? vendorData['ALL']['ALL'] : [];
+                if (data.length > 0) {
+                    series = levelOrder4.map(lv => ({
+                        name: lv,
+                        type: 'bar',
+                        stack: 'total',
+                        data: data.map(d => {
+                            const val = d.levels && d.levels[lv] ? d.levels[lv] : 0;
+                            return Math.round(val * factor);
+                        })
+                    }));
+                }
+            } else if (channel === 'ALL' && level !== 'ALL') {
+                // ALL渠道+单等级 = 堆叠柱状图（渠道分布）
+                data = vendorData['ALL'] && vendorData['ALL'][level] ? vendorData['ALL'][level] : [];
+                if (data.length > 0 && data[0].channels) {
+                    // 获取所有渠道名称
+                    const allChannels = ['华为', 'OPPO', 'VIVO', '小米', '荣耀', '4399', '好游快爆', 'B站', 'TapTap'];
+                    series = allChannels.map(ch => ({
+                        name: ch,
+                        type: 'bar',
+                        stack: 'total',
+                        data: data.map(d => {
+                            const val = d.channels && d.channels[ch] ? d.channels[ch] : 0;
+                            return Math.round(val * factor);
+                        })
+                    }));
+                }
+            } else if (channel !== 'ALL' && level === 'ALL') {
+                // 单渠道+ALL等级 = 堆叠柱状图（等级分布）
+                data = channelData['ALL'] || [];
+                if (data.length > 0) {
+                    series = levelOrder4.map(lv => ({
+                        name: lv,
+                        type: 'bar',
+                        stack: 'total',
+                        data: data.map(d => {
+                            const val = d.levels && d.levels[lv] ? d.levels[lv] : 0;
+                            return Math.round(val * factor);
+                        })
+                    }));
+                }
+            } else {
+                // 单渠道+单等级 = 普通柱状图
+                data = channelData[level] || [];
+                series = [{
+                    name: '资源数量',
+                    type: 'bar',
+                    data: data.map(d => Math.round(d.value * factor)),
+                    itemStyle: { color: '#667eea' }
+                }];
+            }
+            
+            // 如果没有数据，显示空状态
+            if (data.length === 0) {
+                data = [{ name: '暂无数据', value: 0 }];
+                series = [{
+                    name: '资源数量',
+                    type: 'bar',
+                    data: [0],
+                    itemStyle: { color: '#ccc' }
+                }];
+            }
+            
+            // 为series添加颜色
+            series.forEach(s => {
+                if (levelColors4[s.name]) {
+                    s.itemStyle = { color: levelColors4[s.name] };
+                } else if (channelColorMap4[s.name]) {
+                    s.itemStyle = { color: channelColorMap4[s.name] };
+                }
+            });
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        // 计算总数
+                        let total = 0;
+                        params.forEach(item => {
+                            total += item.value || 0;
+                        });
+                        result += `总计: ${total.toLocaleString()}<br/>`;
+                        params.forEach(item => {
+                            const val = item.value || 0;
+                            const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                            result += `${item.marker} ${item.seriesName}: ${val.toLocaleString()} (${pct}%)<br/>`;
+                        });
+                        return result;
+                    }
+                },
+                legend: { bottom: 0, data: series.map(s => s.name),
+                    
+                    textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                    itemGap: 15
+                },
+                grid: getGrid(),
+                xAxis: {
+                    type: 'category',
+                    data: data.map(d => d.name),
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: {
+                        interval: 0,
+                        rotate: 30,
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    splitLine: { show: false },
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisLabel: { 
+                        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif',
+                        fontWeight: 'normal'
+                    }
+                },
+                series: series
+            };
+            
+            chart.setOption(option, true);
+        }
+
+        // ─── 下钻图表（看板四明细）───
+        let chart4Detail = null;
+        let drillDown4Expanded = false;
+
+        function toggleDrillDown4() {
+            const container = document.getElementById('drillDownContainer4');
+            const btn = document.getElementById('drillDownBtn4');
+            drillDown4Expanded = !drillDown4Expanded;
+            if (drillDown4Expanded) {
+                container.style.maxHeight = '5000px';
+                btn.classList.add('active');
+                populateDrill4Games();
+                if (!chart4Detail) {
+                    chart4Detail = echarts.init(document.getElementById('chart4Detail'));
+                }
+                updateDrill4();
+            } else {
+                container.style.maxHeight = '0';
+                btn.classList.remove('active');
+            }
+        }
+
+        // 根据一级看板厂商动态填充游戏列表
+        function populateDrill4Games() {
+            const vendor = document.getElementById('filterVendor').value;
+            const vendorData = (board4Data && board4Data[vendor]) || {};
+            const allGames = vendorData['ALL'] && vendorData['ALL']['ALL'] ? vendorData['ALL']['ALL'] : [];
+            const sel = document.getElementById('drill4Game');
+            const prev = sel.value;
+            sel.innerHTML = '';
+            allGames.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g.name;
+                opt.textContent = g.name;
+                sel.appendChild(opt);
+            });
+            // 保持之前的选择
+            if (prev && [...sel.options].some(o => o.value === prev)) {
+                sel.value = prev;
+            }
+        }
+
+        // 从JSON获取下钻4的时间序列数据
+        function getDrill4TimeData(game, channel, level) {
+            if (!ALL_DATA) return { labels: [], current: [], lastYear: [], timeKeys: [] };
+            const timeType = document.getElementById('filterTimeType').value;
+            let start = currentRange.start, end = currentRange.end;
+            if (start > end) { const t = start; start = end; end = t; }
+            const vendor = document.getElementById('filterVendor').value;
+            const labels = [];
+            const current = [];
+            const lastYear = [];
+            const timeKeys = [];
+
+            if (timeType === 'monthly') {
+                const keys = getMonthKeys(start, end);
+                for (const k of keys) {
+                    labels.push(k.split('-')[1].replace(/^0/, '') + '月');
+                    timeKeys.push(k);
+                    current.push(getBoard4ItemCount(ALL_DATA.board4_monthly && ALL_DATA.board4_monthly[k], vendor, channel, level, game));
+                    const lastK = (parseInt(k.split('-')[0], 10) - 1) + '-' + k.split('-')[1];
+                    lastYear.push(getBoard4ItemCount(ALL_DATA.board4_monthly && ALL_DATA.board4_monthly[lastK], vendor, channel, level, game));
+                }
+            } else {
+                const keys = getDayKeys(start, end);
+                for (const k of keys) {
+                    labels.push(parseInt(k.split('-')[2], 10) + '日');
+                    timeKeys.push(k);
+                    const dailySource = ALL_DATA.board4_daily && ALL_DATA.board4_daily[k];
+                    if (dailySource) {
+                        current.push(getBoard4ItemCount(dailySource, vendor, channel, level, game));
+                    } else {
+                        const mk = k.substring(0, 7);
+                        const monthlySource = ALL_DATA.board4_monthly && ALL_DATA.board4_monthly[mk];
+                        const daysInMonth = new Date(parseInt(mk.split('-')[0], 10), parseInt(mk.split('-')[1], 10), 0).getDate();
+                        const monthlyCount = getBoard4ItemCount(monthlySource, vendor, channel, level, game);
+                        current.push(monthlyCount > 0 ? Math.round(monthlyCount / daysInMonth) : 0);
+                    }
+
+                    const parts = k.split('-');
+                    const lastDayKey = (parseInt(parts[0], 10) - 1) + '-' + parts[1] + '-' + parts[2];
+                    const lastDailySource = ALL_DATA.board4_daily && ALL_DATA.board4_daily[lastDayKey];
+                    if (lastDailySource) {
+                        lastYear.push(getBoard4ItemCount(lastDailySource, vendor, channel, level, game));
+                    } else {
+                        const lastMk = (parseInt(parts[0], 10) - 1) + '-' + parts[1];
+                        const monthlyLastSource = ALL_DATA.board4_monthly && ALL_DATA.board4_monthly[lastMk];
+                        const daysInMonth = new Date(parseInt(parts[0], 10) - 1, parseInt(parts[1], 10), 0).getDate();
+                        const monthlyLastCount = getBoard4ItemCount(monthlyLastSource, vendor, channel, level, game);
+                        lastYear.push(monthlyLastCount > 0 ? Math.round(monthlyLastCount / daysInMonth) : 0);
+                    }
+                }
+            }
+            return { labels, current, lastYear, timeKeys };
+        }
+
+        function updateDrill4() {
+            if (!chart4Detail) return;
+            closeDrill4ScreenshotDrawer();
+            const game = document.getElementById('drill4Game').value;
+            const channel = document.getElementById('drill4Channel').value;
+            const level = document.getElementById('drill4Level').value;
+            const vendor = document.getElementById('filterVendor').value;
+            const vendorName = vendor;
+            const timeType = document.getElementById('filterTimeType').value;
+            const isMonthly = timeType === 'monthly';
+
+            if (!game) {
+                return;
+            }
+
+            // 趋势图
+            const td = getDrill4TimeData(game, channel, level);
+
+            const yoy = td.labels.map((_, i) => td.lastYear[i] > 0 ? +((td.current[i] - td.lastYear[i]) / td.lastYear[i] * 100).toFixed(1) : 0);
+
+            const barColor = vendor === '腾讯' ? '#5B8FF9' : '#F6903D';
+            const lineColor = vendor === '腾讯' ? '#E8684A' : '#C2410C';
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis', axisPointer: { type: 'shadow' },
+                    formatter: function(params) {
+                        let r = params[0].axisValue + '<br/>';
+                        params.forEach(p => {
+                            if (p.componentSubType === 'bar') r += `${p.marker} ${p.seriesName}: ${p.value.toLocaleString()}<br/>`;
+                            else r += `${p.marker} ${p.seriesName}: ${p.value >= 0 ? '+' : ''}${p.value}%<br/>`;
+                        });
+                        return r;
+                    }
+                },
+                legend: { bottom: 0, data: ['资源数量', 'YoY'],  textStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' } },
+                grid: getGrid(),
+                xAxis: {
+                    type: 'category', data: td.labels,
+                    axisLine: { show: true, lineStyle: { color: '#333' } },
+                    axisTick: { show: false },
+                    axisLabel: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif', interval: isMonthly ? 0 : 'auto', rotate: isMonthly ? 0 : 30 }
+                },
+                yAxis: [
+                    { type: 'value', name: '资源数量', nameTextStyle: { fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                      axisLabel: { formatter: '{value}', fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' },
+                      splitLine: { show: false }, axisLine: { show: true, lineStyle: { color: '#333' } } },
+                    getYoYAxis(yoy || [])
+                ],
+                series: [
+                    {
+                        name: '资源数量', type: 'bar', data: td.current,
+                        barMaxWidth: 50,
+                        itemStyle: { color: barColor, borderRadius: [3, 3, 0, 0] },
+                        label: { show: isMonthly, position: 'top', formatter: '{c}', fontSize: 11, color: '#333', fontWeight: 500, textBorderColor: '#fff', textBorderWidth: 2, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                    },
+                    {
+                        name: 'YoY', type: 'line', yAxisIndex: 1, data: yoy,
+                        symbol: 'circle', symbolSize: 9,
+                        lineStyle: { color: '#1F2937', width: 2.5, type: 'solid' },
+                        itemStyle: { color: '#1F2937', borderColor: '#fff', borderWidth: 2 },
+                        label: { show: isMonthly, formatter: function(p) { return (p.value >= 0 ? '+' : '') + p.value + '%'; },
+                            fontSize: 11, color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif' }
+                    }
+                ]
+            };
+            chart4Detail.setOption(option, true);
+
+            // 点击柱子跳转截图页面
+            chart4Detail.off('click');
+            chart4Detail.on('click', function(params) {
+                if (params.componentSubType !== 'bar') return;
+                const dateKey = !isMonthly && td.timeKeys && td.timeKeys[params.dataIndex] ? td.timeKeys[params.dataIndex] : '';
+                openDrill4ScreenshotDrawer(game, channel, level, dateKey);
+            });
+        }
+
+
+
+        // 更新所有看板（使用真实JSON数据）
+        let currentRange = { start: '2026-01', end: '2026-03' };
+
+        function updateAllCharts(charts) {
+            if (!ALL_DATA) return;
+            const timeType = document.getElementById('filterTimeType').value;
+            let startTime = currentRange.start;
+            let endTime = currentRange.end;
+            if (startTime > endTime) { const temp = startTime; startTime = endTime; endTime = temp; }
+
+            // 根据时间类型获取聚合数据
+            const source = timeType === 'monthly' ? ALL_DATA.monthly : ALL_DATA.daily;
+            const keys = timeType === 'monthly' ? getMonthKeys(startTime, endTime) : getDayKeys(startTime, endTime);
+
+            // 去年同期的key
+            const lastYearKeys = keys.map(k => {
+                const parts = k.split('-');
+                parts[0] = String(parseInt(parts[0]) - 1);
+                return parts.join('-');
+            });
+
+            // 聚合board1
+            const cur1 = aggregateBoard1(keys, source);
+            const last1 = aggregateBoard1(lastYearKeys, source);
+            const curTotal1 = cur1['腾讯'] + cur1['网易'] + cur1['其他'];
+            const lastTotal1 = last1['腾讯'] + last1['网易'] + last1['其他'];
+
+            // 生成categories（固定为"去年同期"和"当前周期"）
+            const categories = ['去年同期', '当前周期'];
+
+            // 更新全局数据
+            board1Data = {
+                categories,
+                series: [
+                    { name: '腾讯', rawData: [last1['腾讯'], cur1['腾讯']] },
+                    { name: '网易', rawData: [last1['网易'], cur1['网易']] },
+                    { name: '其他', rawData: [last1['其他'], cur1['其他']] }
+                ],
+                totals: [lastTotal1, curTotal1]
+            };
+
+            charts.chart1.setOption({
+                xAxis: { data: categories },
+                series: [
+                    { data: board1Data.series[0].rawData },
+                    { data: board1Data.series[1].rawData },
+                    { 
+                        data: board1Data.series[2].rawData,
+                        label: { 
+                            show: true, 
+                            formatter: function(params) {
+                                return board1Data.totals[params.dataIndex].toLocaleString();
+                            },
+                            position: 'top', color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                        }
+                    }
+                ]
+            });
+            // 刷新graphic元素（虚线和YoY标注）
+            refreshChart1Graphic(charts.chart1);
+            
+            // 聚合board2
+            const cur2 = aggregateBoard2(keys, source);
+            board2Data = {
+                categories: CHANNELS_5,
+                series: [
+                    { name: '腾讯', rawData: CHANNELS_5.map(ch => cur2[ch]['腾讯']) },
+                    { name: '网易', rawData: CHANNELS_5.map(ch => cur2[ch]['网易']) },
+                    { name: '其他', rawData: CHANNELS_5.map(ch => cur2[ch]['其他']) }
+                ],
+                totals: CHANNELS_5.map(ch => cur2[ch]['腾讯'] + cur2[ch]['网易'] + cur2[ch]['其他'])
+            };
+
+            charts.chart2.setOption({
+                series: [
+                    { data: board2Data.series[0].rawData },
+                    { data: board2Data.series[1].rawData },
+                    { 
+                        data: board2Data.series[2].rawData,
+                        label: { 
+                            show: true, 
+                            formatter: function(params) {
+                                return board2Data.totals[params.dataIndex].toLocaleString();
+                            },
+                            position: 'top', color: '#1F2937', fontWeight: 'bold', textBorderColor: '#fff', textBorderWidth: 3, fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, PingFang SC, sans-serif'
+                        }
+                    }
+                ]
+            });
+            
+            // 聚合board3
+            const cur3 = aggregateBoard3(keys, source);
+            board3Data = {
+                channels: CHANNELS_5,
+                tencent: { totals: CHANNELS_5.map(ch => cur3[ch]['腾讯'].total) },
+                netease: { totals: CHANNELS_5.map(ch => cur3[ch]['网易'].total) }
+            };
+            for (const lv of LEVELS_5) {
+                board3Data.tencent[lv] = CHANNELS_5.map(ch => {
+                    const t = cur3[ch]['腾讯'].total;
+                    return t > 0 ? +(cur3[ch]['腾讯'][lv] / t * 100).toFixed(1) : 0;
+                });
+                board3Data.netease[lv] = CHANNELS_5.map(ch => {
+                    const t = cur3[ch]['网易'].total;
+                    return t > 0 ? +(cur3[ch]['网易'][lv] / t * 100).toFixed(1) : 0;
+                });
+            }
+
+            const channels = CHANNELS_5;
+            const levels = ['C', 'B+', 'A', 'A+', 'S'];
+            const newSeries = [];
+            
+            levels.forEach((level, idx) => {
+                const tencentAbsData = CHANNELS_5.map(ch => cur3[ch]['腾讯'][level] || 0);
+                newSeries.push({
+                    name: `${level}(腾讯)`,
+                    type: 'bar',
+                    stack: '腾讯',
+                    data: tencentAbsData,
+                    itemStyle: { 
+                        color: ['#BFDBFE', '#93C5FD', '#60A5FA', '#3B82F6', '#1D4ED8'][idx] 
+                    }
+                });
+                
+                const neteaseAbsData = CHANNELS_5.map(ch => cur3[ch]['网易'][level] || 0);
+                newSeries.push({
+                    name: `${level}(网易)`,
+                    type: 'bar',
+                    stack: '网易',
+                    data: neteaseAbsData,
+                    itemStyle: { 
+                        color: ['#FED7AA', '#FDBA74', '#F97316', '#EA580C', '#C2410C'][idx] 
+                    }
+                });
+            });
+            
+            charts.chart3.setOption({
+                series: newSeries
+            });
+            
+            // 聚合board4：按月使用月度数据；按日优先使用精确日数据，缺失时回退到月度数据
+            if (timeType === 'daily' && ALL_DATA.board4_daily) {
+                const exactBoard4 = aggregateBoard4FromSource(keys, ALL_DATA.board4_daily || {});
+                const hasExactData = ['腾讯', '网易'].some(vendor => {
+                    const vendorData = exactBoard4[vendor] && exactBoard4[vendor]['ALL'] && exactBoard4[vendor]['ALL']['ALL'];
+                    return vendorData && vendorData.length > 0;
+                });
+                if (hasExactData) {
+                    board4Data = exactBoard4;
+                } else {
+                    const monthKeysForB4 = getMonthKeys(startTime.substring(0,7), endTime.substring(0,7));
+                    board4Data = aggregateBoard4(monthKeysForB4);
+                }
+            } else {
+                const monthKeysForB4 = timeType === 'monthly' ? keys : getMonthKeys(startTime.substring(0,7), endTime.substring(0,7));
+                board4Data = aggregateBoard4(monthKeysForB4);
+            }
+            updateChart4(charts.chart4);
+
+            // 如果下钻图已展开，联动更新
+            if (drillDown1Expanded && chart1Detail) {
+                updateChart1Detail();
+            }
+            if (drillDown2Expanded && chart2Detail) {
+                updateChart2Detail();
+            }
+            if (drillDown3Expanded && chart3Detail) {
+                updateChart3Detail();
+            }
+            if (drillDown4Expanded && chart4Detail) {
+                populateDrill4Games();
+                updateDrill4();
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            Promise.all([
+                fetchJsonWithFallback('all_data.json', false),
+                fetchJsonWithFallback('daily_snapshot_data.json', true)
+            ])
+                .then(([baseData, snapshotData]) => {
+                    ALL_DATA = mergeDashboardData(baseData, snapshotData);
+                    SNAPSHOT_SCREENSHOTS = (snapshotData && snapshotData.screenshots) || {};
+                    updateHeaderSubtitle();
+                    buildInitialData();
+                    initDashboard();
+                })
+                .catch(err => {
+                    console.error('加载数据失败:', err);
+                    alert('数据加载失败，请确保 all_data.json 存在');
+                });
+        });
+
+        function initDashboard() {
+            const chart1 = initChart1();
+            const chart2 = initChart2();
+            const chart3 = initChart3();
+            const chart4 = initChart4();
+            
+            const charts = { chart1, chart2, chart3, chart4 };
+
+            // 填充时间选项（动态从JSON数据获取）
+            function populateTimeOptions() {
+                const timeType = document.getElementById('filterTimeType').value;
+                const startSel = document.getElementById('filterStart');
+                const endSel = document.getElementById('filterEnd');
+                startSel.innerHTML = '';
+                endSel.innerHTML = '';
+
+                if (timeType === 'monthly') {
+                    // 只显示2026年的月份
+                    const months = Object.keys(ALL_DATA.monthly).sort().filter(k => k.startsWith('2026'));
+                    months.forEach(v => {
+                        startSel.add(new Option(v.replace('-', '年') + '月', v));
+                        endSel.add(new Option(v.replace('-', '年') + '月', v));
+                    });
+                    if (months.length > 0) {
+                        startSel.value = months[0];
+                        endSel.value = months[Math.min(2, months.length - 1)];
+                        currentRange = { start: startSel.value, end: endSel.value };
+                    }
+                } else {
+                    // 按日：显示全部可用的2026年日期，避免只有最新月可选
+                    const allDays = Object.keys(ALL_DATA.daily).sort().filter(k => k.startsWith('2026'));
+                    allDays.forEach(d => {
+                        const parts = d.split('-');
+                        const label = parseInt(parts[1], 10) + '月' + parseInt(parts[2], 10) + '日';
+                        startSel.add(new Option(label, d));
+                        endSel.add(new Option(label, d));
+                    });
+                    if (allDays.length > 0) {
+                        const defaultEnd = allDays[allDays.length - 1];
+                        const defaultStart = ['2026-04-07', '2026-04-10', allDays[0]].find(day => allDays.includes(day)) || allDays[0];
+                        startSel.value = defaultStart;
+                        endSel.value = defaultEnd;
+                        currentRange = { start: startSel.value, end: endSel.value };
+                    }
+
+                }
+            }
+
+            populateTimeOptions();
+
+            // 粒度切换
+            document.getElementById('filterTimeType').addEventListener('change', function() {
+                populateTimeOptions();
+                updateAllCharts(charts);
+            });
+
+            // 起止时间变化
+            document.getElementById('filterStart').addEventListener('change', function() {
+                currentRange.start = this.value;
+                updateAllCharts(charts);
+            });
+            document.getElementById('filterEnd').addEventListener('change', function() {
+                currentRange.end = this.value;
+                updateAllCharts(charts);
+            });
+            
+            // 看板四筛选事件
+            ['filterVendor', 'filterChannel', 'filterLevel'].forEach(id => {
+                document.getElementById(id).addEventListener('change', () => {
+                    updateChart4(chart4);
+                    if (id === 'filterVendor' && drillDown4Expanded) {
+                        populateDrill4Games();
+                        updateDrill4();
+                    }
+                });
+            });
+            
+            // 响应式调整
+            window.addEventListener('resize', function() {
+                chart1.resize();
+                chart2.resize();
+                chart3.resize();
+                chart4.resize();
+                if (chart1Detail) chart1Detail.resize();
+                if (chart2Detail) chart2Detail.resize();
+                if (chart3Detail) chart3Detail.resize();
+                if (chart4Detail) chart4Detail.resize();
+            });
+
+            // 吸顶阴影检测
+            const globalFilter = document.getElementById('globalFilter');
+            const observer = new IntersectionObserver(
+                ([e]) => {
+                    globalFilter.classList.toggle('is-stuck', e.intersectionRatio < 1);
+                },
+                { threshold: [1], rootMargin: '-1px 0px 0px 0px' }
+            );
+            observer.observe(globalFilter);
+        }
+    </script>
+</body>
+</html>

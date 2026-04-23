@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资源位截图</title>
+    <style>
+        :root {
+            --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --c-text: #1F2937;
+            --c-text-secondary: #6B7280;
+            --c-border: #EAEDF3;
+            --c-bg: #F7F8FC;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font);
+            background: var(--c-bg);
+            color: var(--c-text);
+            -webkit-font-smoothing: antialiased;
+        }
+        .header {
+            background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+            color: white;
+            padding: 14px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .header-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .back-btn {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+        .back-btn:hover { opacity: 1; }
+        .header h1 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .header .subtitle {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+        .container {
+            padding: 12px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .gallery-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .gallery-card {
+            background: #fff;
+            border: 1px solid var(--c-border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .gallery-card .card-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            font-size: 13px;
+            color: var(--c-text-secondary);
+            border-bottom: 1px solid var(--c-border);
+            background: #fff;
+        }
+        .gallery-card .card-pos {
+            color: var(--c-text);
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .gallery-card .card-date {
+            margin-left: auto;
+            color: #9CA3AF;
+            font-size: 12px;
+        }
+        .gallery-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #F0F1F3;
+            cursor: pointer;
+        }
+        .level-tag {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+            margin-right: 2px;
+        }
+        .level-tag-S { background: #E8684A; }
+        .level-tag-Ap { background: #F6903D; }
+        .level-tag-A { background: #5B8FF9; }
+        .level-tag-Bp { background: #62DAAB; }
+        .level-tag-C { background: #9CA3AF; }
+        .no-screenshot {
+            padding: 60px 20px;
+            text-align: center;
+            color: #D1D5DB;
+            font-size: 15px;
+        }
+        /* 大屏：两列 */
+        @media (min-width: 768px) {
+            .gallery-list {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 14px;
+            }
+        }
+        @media (min-width: 1100px) {
+            .gallery-list {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        /* 弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-content {
+            position: relative;
+            max-width: 95vw;
+            max-height: 95vh;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+        }
+        .modal-content img {
+            display: block;
+            max-width: 95vw;
+            max-height: 92vh;
+            object-fit: contain;
+        }
+        .modal-close {
+            position: absolute;
+            top: 8px; right: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            font-size: 20px;
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-row">
+            <a class="back-btn" href="javascript:history.back()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                返回
+            </a>
+            <div>
+                <h1 id="pageTitle">资源位截图</h1>
+                <div class="subtitle" id="pageSubtitle"></div>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="gallery-list" id="galleryList"></div>
+    </div>
+
+    <div class="modal-overlay" id="imgModal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <img id="modalImg" src="" />
+        </div>
+    </div>
+
+    <script>
+        // 从URL参数读取筛选条件
+        const params = new URLSearchParams(window.location.search);
+        const game = params.get('game') || '';
+        const channel = params.get('channel') || '';
+        const level = params.get('level') || '';
+        const dateFilter = params.get('date') || '';
+        let screenshotData = {};
+
+        document.getElementById('pageTitle').textContent = game + ' - 资源位截图';
+        document.getElementById('pageSubtitle').textContent = channel + ' · ' + level + '级' + (dateFilter ? ' · ' + dateFilter : '');
+
+        // 截图数据（和dashboard.html保持一致）
+        const P48 = '../screenshots/资源4.8/资源4.8';
+        const P49 = '../screenshots/资源4.9/资源4.9';
+        const baseScreenshotData = {
+            '华为': {
+                '三角洲行动': {
+                    'S': [{ date: '04-08', pos: '资源位1', img: P48+'/华为/1.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位2', img: P48+'/华为/2.jpg' }, { date: '04-09', pos: '资源位1', img: P49+'/华为/1.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位3', img: P48+'/华为/3.jpg' }]
+                },
+                '王者荣耀': {
+                    'S': [{ date: '04-08', pos: '资源位4', img: P48+'/华为/4.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位5', img: P48+'/华为/5.jpg' }, { date: '04-09', pos: '资源位2', img: P49+'/华为/2.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位6', img: P48+'/华为/6.jpg' }, { date: '04-09', pos: '资源位3', img: P49+'/华为/3.jpg' }]
+                },
+                '金铲铲之战': {
+                    'S': [{ date: '04-09', pos: '资源位4', img: P49+'/华为/4.jpg' }],
+                    'A+': [{ date: '04-09', pos: '资源位5', img: P49+'/华为/5.jpg' }],
+                    'A': [{ date: '04-09', pos: '资源位6', img: P49+'/华为/6.jpg' }]
+                }
+            },
+            'OPPO': {
+                '王者荣耀': {
+                    'S': [{ date: '04-08', pos: '资源位1', img: P48+'/OPPO/1.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位2', img: P48+'/OPPO/2.jpg' }, { date: '04-08', pos: '资源位3', img: P48+'/OPPO/3.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位4', img: P48+'/OPPO/4.jpg' }]
+                },
+                '三角洲行动': {
+                    'S': [{ date: '04-08', pos: '资源位5', img: P48+'/OPPO/5.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位6', img: P48+'/OPPO/6.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位7', img: P48+'/OPPO/7.jpg' }, { date: '04-08', pos: '资源位8', img: P48+'/OPPO/8.jpg' }]
+                },
+                '暗区突围': {
+                    'S': [{ date: '04-08', pos: '资源位9', img: P48+'/OPPO/9.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位10', img: P48+'/OPPO/10.jpg' }],
+                    'A': []
+                }
+            },
+            'VIVO': {
+                '王者荣耀': {
+                    'S': [{ date: '04-08', pos: '资源位1', img: P48+'/vivo/1.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位2', img: P48+'/vivo/2.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位3', img: P48+'/vivo/3.jpg' }, { date: '04-08', pos: '资源位4', img: P48+'/vivo/4.jpg' }]
+                },
+                '三角洲行动': {
+                    'S': [{ date: '04-09', pos: '资源位1', img: P49+'/vivo/1.jpg' }],
+                    'A+': [{ date: '04-09', pos: '资源位2', img: P49+'/vivo/2.jpg' }, { date: '04-09', pos: '资源位3', img: P49+'/vivo/3.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位5', img: P48+'/vivo/5.jpg' }]
+                },
+                '和平精英': {
+                    'S': [{ date: '04-08', pos: '资源位6', img: P48+'/vivo/6.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位7', img: P48+'/vivo/7.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位8', img: P48+'/vivo/8.jpg' }]
+                }
+            },
+            '荣耀': {
+                '王者荣耀': {
+                    'S': [{ date: '04-08', pos: '资源位1', img: P48+'/荣耀/1.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位2', img: P48+'/荣耀/2.jpg' }, { date: '04-09', pos: '资源位1', img: P49+'/荣耀/1.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位3', img: P48+'/荣耀/3.jpg' }]
+                },
+                '三角洲行动': {
+                    'S': [{ date: '04-08', pos: '资源位4', img: P48+'/荣耀/4.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位5', img: P48+'/荣耀/5.jpg' }],
+                    'A': [{ date: '04-09', pos: '资源位2', img: P49+'/荣耀/2.jpg' }, { date: '04-09', pos: '资源位3', img: P49+'/荣耀/3.jpg' }]
+                },
+                '暗区突围': {
+                    'S': [{ date: '04-08', pos: '资源位6', img: P48+'/荣耀/6.jpg' }],
+                    'A+': [{ date: '04-09', pos: '资源位4', img: P49+'/荣耀/4.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位7', img: P48+'/荣耀/7.jpg' }]
+                }
+            },
+            '小米': {
+                '王者荣耀': {
+                    'S': [{ date: '04-08', pos: '资源位1', img: P48+'/小米/1.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位2', img: P48+'/小米/2.jpg' }],
+                    'A': [{ date: '04-08', pos: '资源位3', img: P48+'/小米/3.jpg' }]
+                },
+                '三角洲行动': {
+                    'S': [{ date: '04-08', pos: '资源位4', img: P48+'/小米/4.jpg' }],
+                    'A+': [{ date: '04-08', pos: '资源位5', img: P48+'/小米/5.jpg' }],
+                    'A': [{ date: '04-09', pos: '资源位1', img: P49+'/小米/1.jpg' }, { date: '04-09', pos: '资源位2', img: P49+'/小米/2.jpg' }]
+                }
+            }
+        };
+
+        function getLevelTagClass(lv) {
+            return 'level-tag level-tag-' + lv.replace('+', 'p');
+        }
+
+        function deepClone(obj) {
+            return JSON.parse(JSON.stringify(obj || {}));
+        }
+
+        function mergeScreenshotData(base, extra) {
+            const merged = deepClone(base);
+            if (!extra) return merged;
+            Object.entries(extra).forEach(([channelName, gameMap]) => {
+                merged[channelName] = merged[channelName] || {};
+                Object.entries(gameMap || {}).forEach(([gameName, levelMap]) => {
+                    merged[channelName][gameName] = merged[channelName][gameName] || {};
+                    Object.entries(levelMap || {}).forEach(([levelName, shots]) => {
+                        const existing = merged[channelName][gameName][levelName] || [];
+                        const dedupe = new Map();
+                        [...existing, ...(shots || [])].forEach(shot => {
+                            const key = [shot.dateKey || '', shot.date || '', shot.pos || '', shot.img || ''].join('|');
+                            dedupe.set(key, shot);
+                        });
+                        merged[channelName][gameName][levelName] = Array.from(dedupe.values());
+                    });
+                });
+            });
+            return merged;
+        }
+
+        function fetchJsonWithFallback(fileName, optional) {
+            return fetch(fileName)
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                })
+                .catch(() => fetch('./' + fileName).then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                    return r.json();
+                }))
+                .catch(err => {
+                    if (optional) return null;
+                    throw err;
+                });
+        }
+
+        function getFilteredShots() {
+            const chData = screenshotData[channel];
+            const gameData = chData && chData[game];
+            const shots = (gameData && gameData[level]) || [];
+            if (!dateFilter) return shots;
+            return shots.filter(shot => shot.dateKey === dateFilter);
+        }
+
+        function render() {
+            const list = document.getElementById('galleryList');
+            const shots = getFilteredShots();
+
+            if (!shots || shots.length === 0) {
+                list.innerHTML = `<div class="no-screenshot">${dateFilter ? '当天暂无截图' : '暂无截图，待采集'}</div>`;
+                return;
+            }
+
+            const sorted = [...shots].sort((a, b) => {
+                const aKey = a.dateKey || a.date || '';
+                const bKey = b.dateKey || b.date || '';
+                return bKey.localeCompare(aKey) || (a.img || '').localeCompare(b.img || '');
+            });
+            list.innerHTML = sorted.map(s => `
+                <div class="gallery-card">
+                    <div class="card-info">
+                        <span class="${getLevelTagClass(level)}">${level}</span>
+                        <span class="card-pos">${s.pos}</span>
+                        <span class="card-date">${s.date}</span>
+                    </div>
+                    <img src="${s.img}" alt="${s.pos}" onclick="openModal('${s.img}')" onerror="this.alt='图片加载失败'" loading="lazy" />
+                </div>
+            `).join('');
+        }
+
+        function openModal(src) {
+            document.getElementById('modalImg').src = src;
+            document.getElementById('imgModal').classList.add('show');
+        }
+        function closeModal() {
+            document.getElementById('imgModal').classList.remove('show');
+            document.getElementById('modalImg').src = '';
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        fetchJsonWithFallback('daily_snapshot_data.json', true)
+            .then(extraData => {
+                screenshotData = mergeScreenshotData(baseScreenshotData, extraData && extraData.screenshots);
+                render();
+            })
+            .catch(() => {
+                screenshotData = deepClone(baseScreenshotData);
+                render();
+            });
+    </script>
+</body>
+</html>
